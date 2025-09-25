@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Pivot Dashboard (Public)</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<style>
+  body { background:#0b1020; color:#e9edf1; }
+  .card { border:none; border-radius:1rem; box-shadow:0 10px 30px rgba(0,0,0,.25); background:#0f1530; }
+  label { color:#bcd0ff; }
+  select, option { color:#0b1020; }
+  .muted { color:#94a3b8; }
+</style>
+</head>
+<body>
+<div class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h1 class="h4 m-0">Pivot Dashboard (Public)</h1>
+    <span class="small muted">Live from JSONBin</span>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-4">
+      <div class="card p-3">
+        <label for="metric" class="form-label">Metric</label>
+        <select id="metric" class="form-select"></select>
+      </div>
+    </div>
+    <div class="col-md-8">
+      <div class="card p-3">
+        <label for="labels" class="form-label">Row Labels (multi-select)</label>
+        <select id="labels" class="form-select" multiple size="8"></select>
+        <div class="form-text text-light mt-2">
+          Tip: Ctrl/Cmd-click to select multiple. Leave empty to include all.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card p-3 mb-4">
+    <canvas id="chartCanvas" height="120"></canvas>
+  </div>
+
+  <div class="card p-3">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped table-hover align-middle mb-0">
+        <thead>
+          <tr><th>Row Label</th><th id="th-metric">Metric</th></tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const BIN_ID  = "68d5009cd0ea881f408a32ec";
+const DATA_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}/latest`;
+
+let SNAPSHOT = null;
+// IMPORTANT: use a different name than "chart" to avoid clashing with the canvas id
+let _chartInstance = null;
+
+async function loadData() {
+  const r = await fetch(DATA_URL, { cache: "no-store" });
+  if (!r.ok) throw new Error("Failed to fetch JSONBin data");
+  const payload = await r.json();
+  SNAPSHOT = payload.record;
+  if (!SNAPSHOT || !SNAPSHOT.metrics || SNAPSHOT.metrics.length === 0) {
+    throw new Error("No metrics found in the JSON payload.");
+  }
+}
+
+function fillControls() {
+  const metricSel = document.getElementById('metric');
+  const labelsSel = document.getElementById('labels');
+  metricSel.innerHTML = ""; labelsSel.innerHTML = "";
+
+  SNAPSHOT.metrics.forEach(m => {
+    const opt = document.createElement('option'); opt.value = m; opt.textContent = m;
+    metricSel.appendChild(opt);
+  });
+  metricSel.value = SNAPSHOT.metrics[0];
+
+  SNAPSHOT.labels.forEach(l => {
+    const opt = document.createElement('option'); opt.value = l; opt.textContent = l;
+    labelsSel.appendChild(opt);
+  });
+}
+
+function getFiltered(metric, wanted) {
+  let labels = SNAPSHOT.labels.slice();
+  let values = (SNAPSHOT.series[metric] || []).slice();
+  if (wanted && wanted.length) {
+    const set = new Set(wanted), L=[], V=[];
+    labels.forEach((lab,i)=>{ if(set.has(lab)){ L.push(lab); V.push(values[i]); }});
+    labels=L; values=V;
+  }
+  return {labels, values};
+}
+
+function renderChart(labels, values, metric) {
+  const ctx = document.getElementById('chartCanvas').getContext('2d');
+  if (_chartInstance && typeof _chartInstance.destroy === 'function') {
+    _chartInstance.destroy();
+  }
+  _chartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets:[{ label: metric, data: values }] },
+    options:{
+      responsive:true,
+      plugins:{
+        legend:{ labels:{ color:'#e9edf1' } },
+        tooltip:{ mode:'index', intersect:false }
+      },
+      scales:{
+        x:{ ticks:{color:'#e9edf1'}, grid:{color:'rgba(255,255,255,.08)'} },
+        y:{ ticks:{color:'#e9edf1'}, grid:{color:'rgba(255,255,255,.08)'} }
+      }
+    }
+  });
+}
+
+function renderTable(labels, values, metric){
+  document.getElementById('th-metric').textContent = metric;
+  const tbody=document.getElementById('tbody'); tbody.innerHTML='';
+  labels.forEach((lab,i)=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML = `<td>${lab}</td><td>${(values[i]??'').toLocaleString()}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+async function refresh(){
+  const metric = document.getElementById('metric').value;
+  const wanted = Array.from(document.getElementById('labels').selectedOptions).map(o=>o.value);
+  const {labels, values} = getFiltered(metric, wanted);
+  renderChart(labels, values, metric);
+  renderTable(labels, values, metric);
+}
+
+(async function init(){
+  try {
+    await loadData();
+    fillControls();
+    document.getElementById('metric').addEventListener('change', refresh);
+    document.getElementById('labels').addEventListener('change', refresh);
+    await refresh();
+  } catch(e) {
+    alert(e);
+    console.error(e);
+  }
+})();
+</script>
+</body>
+</html>
