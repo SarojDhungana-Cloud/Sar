@@ -16,18 +16,30 @@
   :root { --bg:#0b1020; --card:#0f1530; --text:#e9edf1; --muted:#94a3b8; --excel-grid:#f3f6fb; --excel-lines:#e6ecf5; }
   html,body { height:100%; }
   body { margin:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; }
-  .wrap { max-width:1300px; margin:24px auto; padding:0 12px; }
+
+  /* === WIDEN PAGE TO FULL WIDTH === */
+  .wrap {
+    width:100vw;           /* occupy the full viewport width */
+    max-width:none;        /* remove any max width cap */
+    margin:16px 0;         /* minimal vertical margin */
+    padding:0 8px;         /* small breathing room on the edges */
+    box-sizing:border-box; /* include padding in width */
+  }
+
   .card { background:var(--card); border-radius:14px; padding:14px 16px; box-shadow:0 10px 30px rgba(0,0,0,.25); }
   .row { display:flex; flex-wrap:wrap; gap:16px; }
-  .col { flex:1; min-width:260px; }
+  .col { flex:1; min-width:220px; }
   .muted { color:var(--muted); }
   .btn { background:#1b3cb3; color:#fff; border:none; border-radius:10px; padding:8px 12px; cursor:pointer; }
   .btn.secondary { background:#2b365e; }
   .fieldset { display:grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap:10px; }
   .field { display:flex; flex-direction:column; gap:6px; }
   .label { font-size:12px; color:var(--muted); }
-  select { width:100%; padding:8px 10px; border-radius:10px; border:1px solid #1e2a5a; background:#0c1230; color:#e9edf1; }
-  .main { display:grid; grid-template-columns: 1fr 360px; gap:16px; margin-top:16px; }
+  select, input[type="text"], input[type="number"] { width:100%; padding:8px 10px; border-radius:10px; border:1px solid #1e2a5a; background:#0c1230; color:#e9edf1; }
+
+  /* Use one full-width column (right panel removed earlier) */
+  .main { display:grid; grid-template-columns: 1fr; gap:16px; margin-top:16px; }
+
   #wdr {
     background:
       linear-gradient(var(--excel-lines) 1px, transparent 1px) 0 0/100% 22px,
@@ -35,16 +47,10 @@
       var(--excel-grid);
     border-radius:12px;
   }
-  .rightpanel { height:100%; display:flex; flex-direction:column; }
-  #fieldsPanel { flex:1; min-height:520px; overflow:auto; }
-  .wdr-ui-element-overlay { display:none !important; }
-  .wdr-fields-panel.wdr-ui-element {
-    position:static !important; inset:auto !important;
-    width:100% !important; height:auto !important; max-height:none !important;
-    box-shadow:none !important; background:transparent !important; z-index:1 !important;
-  }
-  .wdr-fields-panel .wdr-ui-header, .wdr-fields-panel .wdr-ui-footer { position:static !important; }
-  .wdr-fields-panel .wdr-ui-content { position:static !important; height:auto !important; max-height:none !important; }
+
+  /* Chart title bar */
+  #chartTitleBar { display:flex; align-items:flex-end; gap:12px; margin-top:12px; flex-wrap:wrap; }
+  #chartTitleDisplay { font-weight:700; margin-top:8px; }
 </style>
 </head>
 <body>
@@ -78,7 +84,7 @@
         </div>
       </div>
 
-      <!-- Week (provisional) -->
+      <!-- Hidden (kept for completeness) -->
       <div class="col tf tf-week" style="display:none;">
         <div class="fieldset">
           <div class="field"><div class="label">Start Year</div><select id="wStartY"></select></div>
@@ -90,7 +96,6 @@
         </div>
       </div>
 
-      <!-- Month -->
       <div class="col tf tf-month" style="display:none;">
         <div class="fieldset">
           <div class="field"><div class="label">Start Year</div><select id="mStartY"></select></div>
@@ -100,7 +105,6 @@
         </div>
       </div>
 
-      <!-- Year -->
       <div class="col tf tf-year" style="display:none;">
         <div class="fieldset">
           <div class="field"><div class="label">Start Year</div><select id="yStartY"></select></div>
@@ -119,12 +123,40 @@
   <div class="main">
     <div class="card">
       <div id="wdr" style="height:520px;"></div>
-      <div id="chart" style="height:420px; margin-top:14px;"></div>
-    </div>
-    <div class="card rightpanel">
-      <div class="muted" style="font-size:12px; margin-bottom:8px;">Pivot Table Fields</div>
-      <div id="fieldsPanel"></div>
-      <div class="muted" style="font-size:12px; margin-top:8px;">Drag fields into <b>Filters</b>, <b>Rows</b>, <b>Columns</b>, and <b>Values</b>.</div>
+
+      <!-- Chart controls -->
+      <div id="chartTitleBar">
+        <div class="col" style="flex:1; min-width:260px;">
+          <div class="label">Chart title (leave blank to auto-generate)</div>
+          <input id="chartTitleInput" type="text" placeholder="Custom chart title"/>
+        </div>
+        <div class="col" style="max-width:220px;">
+          <div class="label">Chart type</div>
+          <select id="chartType">
+            <option value="column" selected>Column</option>
+            <option value="column-stacked">Stacked Column</option>
+            <option value="line">Line</option>
+            <option value="area">Area</option>
+            <option value="bar">Bar</option>
+          </select>
+        </div>
+        <div class="col" style="max-width:160px;">
+          <div class="label">&nbsp;</div>
+          <label style="font-size:13px; display:flex; align-items:center; gap:8px;">
+            <input id="toggleLabels" type="checkbox" style="width:16px; height:16px;"/> Show data labels
+          </label>
+        </div>
+        <div class="col" style="max-width:140px;">
+          <div class="label">Title size (px)</div>
+          <input id="chartTitleSize" type="number" min="10" max="40" step="1" value="16"/>
+        </div>
+        <div class="col" style="max-width:140px; display:flex; align-items:flex-end;">
+          <button id="btnApplyChart" class="btn secondary" style="width:100%;">Apply</button>
+        </div>
+      </div>
+
+      <div id="chartTitleDisplay"></div>
+      <div id="chart" style="height:420px; margin-top:6px;"></div>
     </div>
   </div>
 </div>
@@ -137,397 +169,164 @@ const COL_LINE   = "Line";
 const COL_ENERGY = "Traded Energy";
 const COL_BILL   = "Net Bill in NPR";
 
-let pivot=null, allRows=[], viewRows=[], chartObj=null;
+/* Independent fields for date parts */
+const COL_DAY   = "Traded Date.Day";
+const COL_MONTH = "Traded Date.Month";
+const COL_YEAR  = "Traded Date.Year";
 
-// === dynamic index ===
-let dateIndex = {}; // { [year]: { [month]: Set(days) } }
-let yearsList = [];
+let pivot=null, allRows=[], enrichedRows=[], chartObj=null;
+let DATE_KEY="", ENERGY_KEY="", BILL_KEY="";
 
-// ---------- helpers ----------
+/* ------------ helpers ------------ */
 function ciFindKey(obj,wanted){
   const keys = Object.keys(obj||{});
   const exact = keys.find(k => k.toLowerCase() === wanted.toLowerCase());
   if (exact) return exact;
   return keys.find(k => k.toLowerCase().includes(wanted.toLowerCase())) || wanted;
 }
-
-// ultra-robust date parser
 function parseDateFlexible(v){
   if(v==null) return null;
   if(v instanceof Date && !isNaN(v)) return new Date(v.getFullYear(), v.getMonth(), v.getDate());
-
-  // numeric or numeric string → excel serial or ms
   if(typeof v==="number" || (/^\d+$/.test(String(v).trim()))){
     const n = Number(v);
-    if(!Number.isFinite(n)) return null;
-    // Excel serial (days since 1899-12-30)
     if(n > 20000 && n < 70000){
       const base = new Date(Date.UTC(1899,11,30));
       const d = new Date(base.getTime() + n*86400000);
       return new Date(d.getFullYear(), d.getMonth(), d.getDate());
     }
-    // ms epoch
     const d = new Date(n);
     return isNaN(d)?null:new Date(d.getFullYear(), d.getMonth(), d.getDate());
   }
-
   const s = String(v).trim();
-
-  // ISO yyyy-mm-dd (opt time)
   let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-  if(m){ const y=+m[1], mo=+m[2]-1, d=+m[3]; const dt=new Date(y,mo,d); return isNaN(dt)?null:dt; }
-
-  // yyyy/mm/dd
+  if(m){ const y=+m[1], mo=+m[2]-1, d=+m[3]; const dt=new Date(y,mo,d); return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()); }
   m = s.match(/^(\d{4})[\/](\d{1,2})[\/](\d{1,2})$/);
-  if(m){ const y=+m[1], mo=+m[2]-1, d=+m[3]; const dt=new Date(y,mo,d); return isNaN(dt)?null:dt; }
-
-  // dd/mm/yyyy
+  if(m){ const y=+m[1], mo=+m[2]-1, d=+m[3]; const dt=new Date(y,mo,d); return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()); }
   m = s.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{4})$/);
-  if(m){ const d=+m[1], mo=+m[2]-1, y=+m[3]; const dt=new Date(y,mo,d); return isNaN(dt)?null:dt; }
-
-  // dd-mm-yyyy
+  if(m){ const d=+m[1], mo=+m[2]-1, y=+m[3]; const dt=new Date(y,mo,d); return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()); }
   m = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
-  if(m){ const d=+m[1], mo=+m[2]-1, y=+m[3]; const dt=new Date(y,mo,d); return isNaN(dt)?null:dt; }
-
-  // dd/mm/yy
+  if(m){ const d=+m[1], mo=+m[2]-1, y=+m[3]; const dt=new Date(y,mo,d); return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()); }
   m = s.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{2})$/);
-  if(m){ const d=+m[1], mo=+m[2]-1, yy=+m[3]; const y = yy<=68 ? 2000+yy : 1900+yy; const dt=new Date(y,mo,d); return isNaN(dt)?null:dt; }
-
-  // dd-mm-yy
+  if(m){ const d=+m[1], mo=+m[2]-1, yy=+m[3]; const y = yy<=68 ? 2000+yy : 1900+yy; const dt=new Date(y,mo,d); return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()); }
   m = s.match(/^(\d{1,2})-(\d{1,2})-(\d{2})$/);
-  if(m){ const d=+m[1], mo=+m[2]-1, yy=+m[3]; const y = yy<=68 ? 2000+yy : 1900+yy; const dt=new Date(y,mo,d); return isNaN(dt)?null:dt; }
-
-  // dd-MMM-yyyy and dd MMM yyyy
+  if(m){ const d=+m[1], mo=+m[2]-1, yy=+m[3]; const y = yy<=68 ? 2000+yy : 1900+yy; const dt=new Date(y,mo,d); return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()); }
   m = s.match(/^(\d{1,2})[-\s]([A-Za-z]{3})[-\s](\d{4})$/);
   if(m){
     const monMap={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
     const d=+m[1], mo=monMap[m[2].toLowerCase()], y=+m[3];
-    if(mo!=null){ const dt=new Date(y,mo,d); return isNaN(dt)?null:dt; }
+    if(mo!=null){ const dt=new Date(y,mo,d); return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()); }
   }
-
-  // MMM dd, yyyy
   m = s.match(/^([A-Za-z]{3})\s+(\d{1,2}),\s*(\d{4})$/);
   if(m){
     const monMap={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
     const mo=monMap[m[1].toLowerCase()], d=+m[2], y=+m[3];
-    if(mo!=null){ const dt=new Date(y,mo,d); return isNaN(dt)?null:dt; }
+    if(mo!=null){ const dt=new Date(y,mo,d); return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()); }
   }
-
   const dt = new Date(s);
   return isNaN(dt) ? null : new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
 }
-
-function toDateOnly(v){ const d=parseDateFlexible(v); return d&& !isNaN(d) ? d : null; }
+function toDateOnly(v){ const d=parseDateFlexible(v); return d && !isNaN(d) ? d : null; }
 function monthDays(y,m){ return new Date(y, m+1, 0).getDate(); }
 function fillSelect(sel, arr, map=(x)=>x){ sel.innerHTML=""; arr.forEach(v=>{ const o=document.createElement("option"); o.value=v; o.textContent=map(v); sel.appendChild(o); }); }
 function maxDate(rows,key){ let m=null; rows.forEach(r=>{ const d=toDateOnly(r[key]); if(d && (!m || d>m)) m=d; }); return m; }
-function debounce(fn, ms){ let t; return (...args)=>{ clearTimeout(t); t=setTimeout(()=>fn.apply(null,args), ms); }; }
-const mName = i => new Date(2000,i,1).toLocaleString(undefined,{month:"long"});
+function addDays(d, n){ const x=new Date(d); x.setDate(x.getDate()+n); return new Date(x.getFullYear(),x.getMonth(),x.getDate()); }
+const fmtDate = d => d ? d.toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"}) : "";
 
-// Build chronological index from data
-function buildDateIndex(){
-  dateIndex = {};
-  const dKey = ciFindKey(allRows[0], COL_DATE);
-  allRows.forEach(r=>{
-    const d = toDateOnly(r[dKey]);
-    if(!d) return;
-    const y=d.getFullYear(), m=d.getMonth(), day=d.getDate();
-    if(!dateIndex[y]) dateIndex[y]={};
-    if(!dateIndex[y][m]) dateIndex[y][m]=new Set();
-    dateIndex[y][m].add(day);
+/* --------- Enrich rows with independent date parts (Day/Month/Year) --------- */
+function enrichWithDateParts(rows, dateKey){
+  return rows.map(r=>{
+    const copy = Object.assign({}, r);
+    const d = toDateOnly(r[dateKey]);
+    if (d){
+      copy[COL_DAY]   = d.getDate();
+      copy[COL_MONTH] = new Date(2000,d.getMonth(),1).toLocaleString(undefined,{month:"long"});
+      copy[COL_YEAR]  = d.getFullYear();
+    } else {
+      copy[COL_DAY]   = null;
+      copy[COL_MONTH] = null;
+      copy[COL_YEAR]  = null;
+    }
+    return copy;
   });
-  yearsList = Object.keys(dateIndex).map(Number).sort((a,b)=>a-b);
 }
 
-// Months present in data for a year (chronological)
-function monthsForYear(y){ return dateIndex[y] ? Object.keys(dateIndex[y]).map(Number).sort((a,b)=>a-b) : []; }
-function daysForYM(y,m){ return (dateIndex[y] && dateIndex[y][m]) ? Array.from(dateIndex[y][m]).sort((a,b)=>a-b) : []; }
-
-// Provisional phases
-const PHASE_RANGES = { First:[1,7], Second:[8,14], Third:[15,21], Last:[22,31] };
-function phasesForYM(y,m){
-  const days = daysForYM(y,m);
-  const list=[];
-  for(const [ph,[a,b]] of Object.entries(PHASE_RANGES)){
-    if(days.some(d=>d>=a && d<=b)) list.push(ph);
-  }
-  // If the month has no rows, still list all phases so user can pick — filter may return empty
-  return list.length ? list : ["First","Second","Third","Last"];
-}
-function computePhasesDatesFromIndex(year,month,phase){
-  const range = PHASE_RANGES[phase];
-  if(!range) return null;
-  const present = daysForYM(year,month).filter(d => d>=range[0] && d<=range[1]);
-  if(present.length){
-    return { from:new Date(year,month,present[0]), to:new Date(year,month,present[present.length-1]) };
-  }
-  // if no days exist in that phase for that month, use nominal bounds (still safe for filtering)
-  return { from:new Date(year,month,range[0]), to:new Date(year,month,Math.min(range[1], monthDays(year,month))) };
-}
-
-/* filtering */
-function filterByTimeframe(mode){
-  const dKey = ciFindKey(allRows[0], COL_DATE);
-  const inR=(d,a,b)=>d>=a && d<=b;
-
-  if(mode==="day"){
-    const from=new Date(+dStartY.value,+dStartM.value,+dStartD.value);
-    const to=new Date(+dEndY.value,+dEndM.value,+dEndD.value);
-    return allRows.filter(r=>{ const d=toDateOnly(r[dKey]); return d && inR(d,from,to); });
-  }
-  if(mode==="week"){
-    const a=computePhasesDatesFromIndex(+wStartY.value,+wStartM.value,wStartP.value);
-    const b=computePhasesDatesFromIndex(+wEndY.value,+wEndM.value,wEndP.value);
-    return allRows.filter(r=>{ const d=toDateOnly(r[dKey]); return d && inR(d,a.from,b.to); });
-  }
-  if(mode==="month"){
-    const from=new Date(+mStartY.value,+mStartM.value,1);
-    const to=new Date(+mEndY.value,+mEndM.value,monthDays(+mEndY.value,+mEndM.value));
-    return allRows.filter(r=>{ const d=toDateOnly(r[dKey]); return d && inR(d,from,to); });
-  }
-  if(mode==="year"){
-    const from=new Date(+yStartY.value,0,1), to=new Date(+yEndY.value,11,31);
-    return allRows.filter(r=>{ const d=toDateOnly(r[dKey]); return d && inR(d,from,to); });
-  }
-  return allRows.slice();
-}
-
-/* default slice */
-function buildDefaultSlice(sampleRow){
-  const lineKey   = ciFindKey(sampleRow, COL_LINE);
-  const energyKey = ciFindKey(sampleRow, COL_ENERGY);
-  const billKey   = ciFindKey(sampleRow, COL_BILL);
+/* ---------- DEFAULT FIELDS ---------- */
+function buildDefaultSlice(){
   return {
-    rows:[{ uniqueName: lineKey }],
-    columns:[{ uniqueName: "Measures" }],
-    measures:[
-      { uniqueName: billKey,   aggregation:"sum", caption:"Sum of " + billKey },
-      { uniqueName: energyKey, aggregation:"sum", caption:"Sum of " + energyKey }
+    reportFilters: [{ uniqueName: COL_LINE }],
+    rows:         [{ uniqueName: COL_DAY, sort:"asc" }],
+    columns:      [{ uniqueName: "Measures" }],
+    measures: [
+      { uniqueName: BILL_KEY,   aggregation:"sum", caption:"Sum of " + BILL_KEY },
+      { uniqueName: ENERGY_KEY, aggregation:"sum", caption:"Sum of " + ENERGY_KEY }
     ]
   };
 }
 
-/* chart mirroring */
-function renderChart(){
-  if(!pivot) return;
-  const rpt = pivot.getReport();
-  const rowsDef = (rpt.slice && rpt.slice.rows) ? rpt.slice.rows.slice() : [];
-  const measuresDef = (rpt.slice && rpt.slice.measures) ? rpt.slice.measures.slice() : [];
-
-  if(!measuresDef.length){
-    if(chartObj) chartObj.destroy();
-    document.getElementById("chart").innerHTML="";
-    return;
-  }
-
-  if(rowsDef.length === 0){
-    pivot.highcharts.getData({ type:"column" }, function(cfg){
-      if(cfg.series && cfg.series.length>=2){
-        cfg.yAxis=[{title:{text:cfg.series[0].name}},{title:{text:cfg.series[1].name},opposite:true}];
-        cfg.series[1].yAxis=1;
-      }
-      cfg.title={text:""};
-      if(chartObj) chartObj.destroy();
-      chartObj = Highcharts.chart("chart", cfg);
-    }, function(err){ console.error(err); });
-    return;
-  }
-
-  function resolveMeasure(row, m){
-    const want = (m.caption || m.uniqueName || "").toLowerCase();
-    const fallbacks = [
-      "sum of " + (m.uniqueName||""),
-      "total " + (m.uniqueName||""),
-      (m.uniqueName||"") + " (sum)",
-      "sum of " + (m.caption||"")
-    ].map(s=>s.toLowerCase());
-    const keys = Object.keys(row);
-    for(const k of keys){
-      const lk=k.toLowerCase();
-      if(lk===want || lk.includes(want) || fallbacks.some(f=>lk===f || lk.includes(f))){
-        const v=+row[k]; if(Number.isFinite(v)) return v;
-      }
-    }
-    const rowFields = rowsDef.map(r=>r.uniqueName.toLowerCase());
-    for(const k of keys){
-      const lk=k.toLowerCase();
-      if(rowFields.some(n=>lk===n || lk.includes(n))) continue;
-      const v=+row[k]; if(Number.isFinite(v)) return v;
-    }
-    return null;
-  }
-
-  pivot.getData({ type:"json", slice:rpt.slice }, function(res){
-    const data = (res && res.data) ? res.data : [];
-    const lvlKeys = rowsDef.map(r=>r.uniqueName);
-    const order = [];
-    const parents = {};
-
-    data.forEach(r=>{
-      const present = lvlKeys.map(k => r[ciFindKey(r,k)]);
-      const depth = present.filter(v => v!==undefined && v!==null && v!=="").length;
-      if(depth===0) return;
-
-      const pName = String(present[0]);
-      if(!(pName in parents)){
-        parents[pName] = { subtotal: null, children: [] };
-        order.push(pName);
-      }
-
-      const isLeaf = present.every(v => v!==undefined && v!==null && v!=="");
-      if(isLeaf){
-        parents[pName].children.push(r);
-      }else if(depth===1){
-        parents[pName].subtotal = r;
-      }
-    });
-
-    const categories = [];
-    const flatOrder = [];
-    order.forEach(p=>{
-      const grp = parents[p];
-      if(grp.children.length){
-        const childLabels = [];
-        grp.children.forEach(child=>{
-          const labelParts = lvlKeys.slice(1).map(k => child[ciFindKey(child,k)])
-            .filter(v => v!==undefined && v!==null && v!=="");
-          childLabels.push(String(labelParts.join(" – ")));
-          flatOrder.push({ row: child });
-        });
-        categories.push({ name: p, categories: childLabels });
-      }else if(grp.subtotal){
-        categories.push(String(p));
-        flatOrder.push({ row: grp.subtotal });
-      }
-    });
-
-    const series = measuresDef.map((m,i)=>({
-      name: m.caption || m.uniqueName,
-      type: "column",
-      data: flatOrder.map(o => {
-        const v = resolveMeasure(o.row, m);
-        return Number.isFinite(v) ? v : null;
-      }),
-      yAxis: (i===1 ? 1 : 0)
-    }));
-
-    const hasData = series.some(s => s.data.some(v => v !== null));
-    if(!hasData){
-      pivot.highcharts.getData({ type:"column" }, function(cfg){
-        if(cfg.series && cfg.series.length>=2){
-          cfg.yAxis=[{title:{text:cfg.series[0].name}},{title:{text:cfg.series[1].name},opposite:true}];
-          cfg.series[1].yAxis=1;
-        }
-        cfg.title={text:""};
-        if(chartObj) chartObj.destroy();
-        chartObj = Highcharts.chart("chart", cfg);
-      }, function(err){ console.error(err); });
-      return;
-    }
-
-    const yAxes=[{ title:{ text: measuresDef[0].caption || measuresDef[0].uniqueName } }];
-    if(measuresDef.length>=2){
-      yAxes.push({ title:{ text: measuresDef[1].caption || measuresDef[1].uniqueName }, opposite:true });
-    }
-
-    if(chartObj) chartObj.destroy();
-    chartObj = Highcharts.chart("chart", {
-      chart:{ type:"column" },
-      title:{ text:"" },
-      xAxis:{ categories },
-      yAxis: yAxes,
-      series
-    });
-  }, function(err){ console.error(err); });
+/* title helpers */
+function selectedRangeFromPickers(){
+  const from=new Date(+dStartY.value,+dStartM.value,+dStartD.value);
+  const to=new Date(+dEndY.value,+dEndM.value,+dEndD.value);
+  return {min:from,max:to};
 }
-const rerenderChart = debounce(renderChart, 120);
+function defaultTitle(){
+  const r = selectedRangeFromPickers();
+  return `Sum of Net Bill in NPR & Sum Of Traded Energy by Day from ${fmtDate(r.min)} to ${fmtDate(r.max)}`;
+}
+function updateTitle(){
+  const s = (document.getElementById("chartTitleInput").value || "").trim();
+  const t = s || defaultTitle();
+  const el = document.getElementById("chartTitleDisplay");
+  el.textContent = t;
+  el.style.fontSize = (document.getElementById("chartTitleSize").value || 16) + "px";
+}
 
+/* filtering by pickers */
+function filterByPickers(){
+  const r = selectedRangeFromPickers();
+  const inR=(d,a,b)=>d>=a && d<=b;
+  return enrichedRows.filter(row=>{
+    const d=toDateOnly(row[DATE_KEY]);
+    return d && inR(d,r.min,r.max);
+  });
+}
 function applyTimeframeAndRefresh(){
-  const mode=tfMode.value;
-  const filtered = filterByTimeframe(mode);
+  const filtered = filterByPickers();
   const rpt = pivot.getReport();
-  rpt.dataSource = { data: filtered.length ? filtered : allRows };
+  rpt.dataSource = { data: filtered.length ? filtered : enrichedRows };
   pivot.setReport(rpt);
 }
 
-function setDefaultDateView(){
-  const dKey = ciFindKey(allRows[0], COL_DATE);
-  const last = maxDate(allRows, dKey);
-  viewRows = last ? allRows.filter(r=>{ const d=toDateOnly(r[dKey]); return d && d.getTime()===last.getTime(); }) : allRows.slice();
+/* chart */
+function renderChart(){
+  if(!pivot) return;
+  updateTitle();
+  const showLabels = document.getElementById("toggleLabels").checked;
+  const type = document.getElementById("chartType").value;
+
+  pivot.highcharts.getData({ type }, function(cfg){
+    const leftTitle  = "Sum of " + BILL_KEY;
+    const rightTitle = "Sum of " + ENERGY_KEY;
+    cfg.yAxis=[{title:{text:leftTitle}},{title:{text:rightTitle},opposite:true}];
+    (cfg.series||[]).forEach(s=>{
+      const name=(s.name||"").toLowerCase();
+      if(name.includes(ENERGY_KEY.toLowerCase())) s.yAxis=1; else s.yAxis=0;
+      if(showLabels) s.dataLabels={enabled:true};
+    });
+    cfg.title={ text:"" };
+    if(chartObj) chartObj.destroy();
+    chartObj = Highcharts.chart("chart", cfg);
+  }, function(err){ console.error(err); });
 }
+const rerenderChart = (fn=>{ let t; return ()=>{ clearTimeout(t); t=setTimeout(fn,120); }; })(renderChart);
 
-/* ---------- FULL chronological pickers (all months always visible) ---------- */
-function populateTimeframePickers(){
-  if(!yearsList.length) return;
-  const monthsAll = Array.from({length:12},(_,i)=>i);
-  const mLabel = mName;
-
-  // years in all panels
-  ["dStartY","dEndY","wStartY","wEndY","mStartY","mEndY","yStartY","yEndY"]
-    .forEach(id=>fillSelect(document.getElementById(id), yearsList));
-
-  // months ALWAYS 0..11 for start and end (day/week/month panels)
-  ["dStartM","dEndM","wStartM","wEndM","mStartM","mEndM"]
-    .forEach(id=>fillSelect(document.getElementById(id), monthsAll, mLabel));
-
-  // days will be data-driven for selected Y/M
-  function refreshDay(prefix){
-    const y=+document.getElementById(prefix+"Y").value;
-    const m=+document.getElementById(prefix+"M").value;
-    const days = daysForYM(y,m);
-    // if month has no data, show nominal month length so you can pick (filter may return empty)
-    const list = days.length ? days : Array.from({length:monthDays(y,m)},(_,i)=>i+1);
-    fillSelect(document.getElementById(prefix+"D"), list);
-    // chronological defaults: start=first, end=last
-    document.getElementById(prefix+"D").value = prefix.includes("End") ? list[list.length-1] : list[0];
-  }
-
-  // Week phases list (provisional). If no data → still show all phases.
-  function refreshWeek(prefix){
-    const y=+document.getElementById(prefix+"Y").value;
-    const m=+document.getElementById(prefix+"M").value;
-    const phases = phasesForYM(y,m);
-    fillSelect(document.getElementById(prefix+"P"), phases);
-    document.getElementById(prefix+"P").value = prefix.includes("End") ? phases[phases.length-1] : phases[0];
-  }
-
-  // chronological default years
-  const firstYear = yearsList[0];
-  const lastYear  = yearsList[yearsList.length-1];
-
-  // set defaults
-  document.getElementById("dStartY").value = firstYear;
-  document.getElementById("dEndY").value   = lastYear;
-  document.getElementById("wStartY").value = firstYear;
-  document.getElementById("wEndY").value   = lastYear;
-  document.getElementById("mStartY").value = firstYear;
-  document.getElementById("mEndY").value   = lastYear;
-  // start month = January, end month = December
-  document.getElementById("dStartM").value = 0;
-  document.getElementById("dEndM").value   = 11;
-  document.getElementById("wStartM").value = 0;
-  document.getElementById("wEndM").value   = 11;
-  document.getElementById("mStartM").value = 0;
-  document.getElementById("mEndM").value   = 11;
-
-  refreshDay("dStart"); refreshDay("dEnd");
-  refreshWeek("wStart"); refreshWeek("wEnd");
-
-  // wiring
-  ["dStartY","dStartM"].forEach(id=>document.getElementById(id).onchange=()=>refreshDay("dStart"));
-  ["dEndY","dEndM"].forEach(id=>document.getElementById(id).onchange=()=>refreshDay("dEnd"));
-  ["wStartY","wStartM"].forEach(id=>document.getElementById(id).onchange=()=>refreshWeek("wStart"));
-  ["wEndY","wEndM"].forEach(id=>document.getElementById(id).onchange=()=>refreshWeek("wEnd"));
-
-  // year panel start/end defaults
-  document.getElementById("yStartY").value = firstYear;
-  document.getElementById("yEndY").value   = lastYear;
-}
-
-function showTfSection(mode){
-  document.querySelectorAll(".tf").forEach(el=>el.style.display="none");
-  const sec = document.querySelector(".tf-"+mode);
-  if(sec) sec.style.display="";
+/* pickers setup for last 7 days */
+function setupPickersTo(from,to){
+  const monthLen = (y,m)=>Array.from({length:monthDays(y,m)},(_,i)=>i+1);
+  dStartY.value=from.getFullYear(); dStartM.value=from.getMonth();
+  fillSelect(dStartD, monthLen(from.getFullYear(), from.getMonth())); dStartD.value=from.getDate();
+  dEndY.value=to.getFullYear(); dEndM.value=to.getMonth();
+  fillSelect(dEndD, monthLen(to.getFullYear(), to.getMonth())); dEndD.value=to.getDate();
 }
 
 (async function init(){
@@ -538,9 +337,19 @@ function showTfSection(mode){
     allRows = (payload && payload.record && Array.isArray(payload.record.rows)) ? payload.record.rows : [];
     if(!allRows.length) throw new Error("No flat rows in JSONBin");
 
-    buildDateIndex();               // ← builds 2024, 2025, etc.
-    setDefaultDateView();
-    const slice = buildDefaultSlice(allRows[0]);
+    DATE_KEY   = ciFindKey(allRows[0], COL_DATE);
+    ENERGY_KEY = ciFindKey(allRows[0], COL_ENERGY);
+    BILL_KEY   = ciFindKey(allRows[0], COL_BILL);
+
+    // Enrich with independent Day/Month/Year fields
+    enrichedRows = enrichWithDateParts(allRows, DATE_KEY);
+
+    // default datasource: last 7 days
+    const last = maxDate(enrichedRows, DATE_KEY);
+    const from = last ? addDays(last, -6) : null;
+    const viewRows = (from && last)
+      ? enrichedRows.filter(r=>{ const d=toDateOnly(r[DATE_KEY]); return d && d>=from && d<=last; })
+      : enrichedRows.slice();
 
     pivot = new WebDataRocks({
       container:"#wdr",
@@ -548,29 +357,30 @@ function showTfSection(mode){
       toolbar:true,
       report:{
         dataSource:{ data:viewRows },
-        slice,
+        slice: buildDefaultSlice(),
         options:{ grid:{ type:"classic", showTotals:"rows", showGrandTotals:"rows", showHeaders:true } }
       },
-      customizeToolbar: tb => { tb.getTabs = () => []; },
       reportcomplete: function(){
         pivot.off("reportcomplete");
-        pivot.openFieldsList();
-        const panel  = document.querySelector(".wdr-fields-panel");
-        const holder = document.getElementById("fieldsPanel");
-        if(panel && holder && !holder.contains(panel)){ holder.appendChild(panel); panel.style.height="520px"; }
         pivot.on("aftergriddraw", rerenderChart);
         rerenderChart();
       },
       reportchange: function(){ rerenderChart(); }
     });
 
-    populateTimeframePickers(); // ← months always Jan..Dec (both start & end), years chronological
-    showTfSection("day");
+    // init pickers lists (years + months) and set to last-7 range
+    const years=[...new Set(enrichedRows.map(r=>toDateOnly(r[DATE_KEY])?.getFullYear()).filter(Boolean))].sort((a,b)=>a-b);
+    ["dStartY","dEndY"].forEach(id=>fillSelect(document.getElementById(id), years));
+    const monthsAll = Array.from({length:12},(_,i)=>i);
+    ["dStartM","dEndM"].forEach(id=>fillSelect(document.getElementById(id), monthsAll, i => new Date(2000,i,1).toLocaleString(undefined,{month:"long"})));
+    if (from && last) setupPickersTo(from,last);
 
-    tfMode.onchange  = () => showTfSection(tfMode.value);
-    btnApply.onclick = () => applyTimeframeAndRefresh();
+    // wire controls
+    btnApply.onclick = () => { applyTimeframeAndRefresh(); };
     btnExcel.onclick = () => pivot.exportTo("excel", { filename:"pivot_table" });
     btnPDF.onclick   = () => { if(chartObj) chartObj.exportChart({ type:"application/pdf", filename:"pivot_chart" }); };
+    btnApplyChart.onclick = () => rerenderChart();
+    chartTitleSize.onchange = () => updateTitle();
 
   }catch(e){
     alert(e.message || e);
