@@ -2,154 +2,578 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Pivot Dashboard (Public)</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Energy Pivot Dashboard</title>
+
+<link rel="stylesheet" href="https://cdn.webdatarocks.com/latest/webdatarocks.min.css"/>
+<script src="https://cdn.webdatarocks.com/latest/webdatarocks.js"></script>
+
+<script src="https://code.highcharts.com/highcharts.js"></script>
+<script src="https://code.highcharts.com/modules/exporting.js"></script>
+<script src="https://cdn.webdatarocks.com/latest/webdatarocks.highcharts.js"></script>
+
 <style>
-  body { background:#0b1020; color:#e9edf1; }
-  .card { border:none; border-radius:1rem; box-shadow:0 10px 30px rgba(0,0,0,.25); background:#0f1530; }
-  label { color:#bcd0ff; }
-  select, option { color:#0b1020; }
-  .muted { color:#94a3b8; }
+  :root { --bg:#0b1020; --card:#0f1530; --text:#e9edf1; --muted:#94a3b8; --excel-grid:#f3f6fb; --excel-lines:#e6ecf5; }
+  html,body { height:100%; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; }
+  .wrap { max-width:1300px; margin:24px auto; padding:0 12px; }
+  .card { background:var(--card); border-radius:14px; padding:14px 16px; box-shadow:0 10px 30px rgba(0,0,0,.25); }
+  .row { display:flex; flex-wrap:wrap; gap:16px; }
+  .col { flex:1; min-width:260px; }
+  .muted { color:var(--muted); }
+  .btn { background:#1b3cb3; color:#fff; border:none; border-radius:10px; padding:8px 12px; cursor:pointer; }
+  .btn.secondary { background:#2b365e; }
+  .fieldset { display:grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap:10px; }
+  .field { display:flex; flex-direction:column; gap:6px; }
+  .label { font-size:12px; color:var(--muted); }
+  select { width:100%; padding:8px 10px; border-radius:10px; border:1px solid #1e2a5a; background:#0c1230; color:#e9edf1; }
+  .main { display:grid; grid-template-columns: 1fr 360px; gap:16px; margin-top:16px; }
+  #wdr {
+    background:
+      linear-gradient(var(--excel-lines) 1px, transparent 1px) 0 0/100% 22px,
+      linear-gradient(90deg, var(--excel-lines) 1px, transparent 1px) 0 0/120px 100%,
+      var(--excel-grid);
+    border-radius:12px;
+  }
+  .rightpanel { height:100%; display:flex; flex-direction:column; }
+  #fieldsPanel { flex:1; min-height:520px; overflow:auto; }
+  .wdr-ui-element-overlay { display:none !important; }
+  .wdr-fields-panel.wdr-ui-element {
+    position:static !important; inset:auto !important;
+    width:100% !important; height:auto !important; max-height:none !important;
+    box-shadow:none !important; background:transparent !important; z-index:1 !important;
+  }
+  .wdr-fields-panel .wdr-ui-header, .wdr-fields-panel .wdr-ui-footer { position:static !important; }
+  .wdr-fields-panel .wdr-ui-content { position:static !important; height:auto !important; max-height:none !important; }
 </style>
 </head>
 <body>
-<div class="container py-4">
-  <div class="d-flex align-items-center justify-content-between mb-3">
-    <h1 class="h4 m-0">Pivot Dashboard (Public)</h1>
-    <span class="small muted">Live from JSONBin</span>
+<div class="wrap">
+  <div class="row" style="align-items:center;">
+    <h1 style="margin:0; font-size:22px;">Energy Pivot Dashboard</h1>
+    <div class="muted" style="margin-left:auto; font-size:12px;">Live from JSONBin</div>
   </div>
 
-  <div class="row g-3 mb-3">
-    <div class="col-md-4">
-      <div class="card p-3">
-        <label for="metric" class="form-label">Metric</label>
-        <select id="metric" class="form-select"></select>
+  <div class="card" style="margin-top:12px;">
+    <div class="row">
+      <div class="col">
+        <div class="label">Timeframe</div>
+        <select id="tfMode">
+          <option value="day" selected>Day wise</option>
+          <option value="week">Week wise</option>
+          <option value="month">Month wise</option>
+          <option value="year">Year wise</option>
+        </select>
       </div>
-    </div>
-    <div class="col-md-8">
-      <div class="card p-3">
-        <label for="labels" class="form-label">Row Labels (multi-select)</label>
-        <select id="labels" class="form-select" multiple size="8"></select>
-        <div class="form-text text-light mt-2">
-          Tip: Ctrl/Cmd-click to select multiple. Leave empty to include all.
+
+      <!-- Day -->
+      <div class="col tf tf-day">
+        <div class="fieldset">
+          <div class="field"><div class="label">Start Year</div><select id="dStartY"></select></div>
+          <div class="field"><div class="label">Start Month</div><select id="dStartM"></select></div>
+          <div class="field"><div class="label">Start Day</div><select id="dStartD"></select></div>
+          <div class="field"><div class="label">End Year</div><select id="dEndY"></select></div>
+          <div class="field"><div class="label">End Month</div><select id="dEndM"></select></div>
+          <div class="field"><div class="label">End Day</div><select id="dEndD"></select></div>
         </div>
       </div>
+
+      <!-- Week (provisional) -->
+      <div class="col tf tf-week" style="display:none;">
+        <div class="fieldset">
+          <div class="field"><div class="label">Start Year</div><select id="wStartY"></select></div>
+          <div class="field"><div class="label">Start Month</div><select id="wStartM"></select></div>
+          <div class="field"><div class="label">Start Phase</div><select id="wStartP"></select></div>
+          <div class="field"><div class="label">End Year</div><select id="wEndY"></select></div>
+          <div class="field"><div class="label">End Month</div><select id="wEndM"></select></div>
+          <div class="field"><div class="label">End Phase</div><select id="wEndP"></select></div>
+        </div>
+      </div>
+
+      <!-- Month -->
+      <div class="col tf tf-month" style="display:none;">
+        <div class="fieldset">
+          <div class="field"><div class="label">Start Year</div><select id="mStartY"></select></div>
+          <div class="field"><div class="label">Start Month</div><select id="mStartM"></select></div>
+          <div class="field"><div class="label">End Year</div><select id="mEndY"></select></div>
+          <div class="field"><div class="label">End Month</div><select id="mEndM"></select></div>
+        </div>
+      </div>
+
+      <!-- Year -->
+      <div class="col tf tf-year" style="display:none;">
+        <div class="fieldset">
+          <div class="field"><div class="label">Start Year</div><select id="yStartY"></select></div>
+          <div class="field"><div class="label">End Year</div><select id="yEndY"></select></div>
+        </div>
+      </div>
+
+      <div class="col" style="display:flex; gap:10px; align-items:end;">
+        <button id="btnApply" class="btn">Apply Timeframe</button>
+        <button id="btnExcel" class="btn secondary">Download Excel</button>
+        <button id="btnPDF" class="btn secondary">Download PDF</button>
+      </div>
     </div>
   </div>
 
-  <div class="card p-3 mb-4">
-    <canvas id="chartCanvas" height="120"></canvas>
-  </div>
-
-  <div class="card p-3">
-    <div class="table-responsive">
-      <table class="table table-sm table-striped table-hover align-middle mb-0">
-        <thead>
-          <tr><th>Row Label</th><th id="th-metric">Metric</th></tr>
-        </thead>
-        <tbody id="tbody"></tbody>
-      </table>
+  <div class="main">
+    <div class="card">
+      <div id="wdr" style="height:520px;"></div>
+      <div id="chart" style="height:420px; margin-top:14px;"></div>
+    </div>
+    <div class="card rightpanel">
+      <div class="muted" style="font-size:12px; margin-bottom:8px;">Pivot Table Fields</div>
+      <div id="fieldsPanel"></div>
+      <div class="muted" style="font-size:12px; margin-top:8px;">Drag fields into <b>Filters</b>, <b>Rows</b>, <b>Columns</b>, and <b>Values</b>.</div>
     </div>
   </div>
 </div>
 
 <script>
-const BIN_ID  = "68d5009cd0ea881f408a32ec";
-const DATA_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}/latest`;
+const DATA_URL = "https://api.jsonbin.io/v3/b/68d62f76ae596e708ffc3c1a/latest";
 
-let SNAPSHOT = null;
-// IMPORTANT: use a different name than "chart" to avoid clashing with the canvas id
-let _chartInstance = null;
+const COL_DATE   = "Traded Date";
+const COL_LINE   = "Line";
+const COL_ENERGY = "Traded Energy";
+const COL_BILL   = "Net Bill in NPR";
 
-async function loadData() {
-  const r = await fetch(DATA_URL, { cache: "no-store" });
-  if (!r.ok) throw new Error("Failed to fetch JSONBin data");
-  const payload = await r.json();
-  SNAPSHOT = payload.record;
-  if (!SNAPSHOT || !SNAPSHOT.metrics || SNAPSHOT.metrics.length === 0) {
-    throw new Error("No metrics found in the JSON payload.");
-  }
+let pivot=null, allRows=[], viewRows=[], chartObj=null;
+
+// === dynamic index ===
+let dateIndex = {}; // { [year]: { [month]: Set(days) } }
+let yearsList = [];
+
+// ---------- helpers ----------
+function ciFindKey(obj,wanted){
+  const keys = Object.keys(obj||{});
+  const exact = keys.find(k => k.toLowerCase() === wanted.toLowerCase());
+  if (exact) return exact;
+  return keys.find(k => k.toLowerCase().includes(wanted.toLowerCase())) || wanted;
 }
 
-function fillControls() {
-  const metricSel = document.getElementById('metric');
-  const labelsSel = document.getElementById('labels');
-  metricSel.innerHTML = ""; labelsSel.innerHTML = "";
+// ultra-robust date parser
+function parseDateFlexible(v){
+  if(v==null) return null;
+  if(v instanceof Date && !isNaN(v)) return new Date(v.getFullYear(), v.getMonth(), v.getDate());
 
-  SNAPSHOT.metrics.forEach(m => {
-    const opt = document.createElement('option'); opt.value = m; opt.textContent = m;
-    metricSel.appendChild(opt);
+  // numeric or numeric string → excel serial or ms
+  if(typeof v==="number" || (/^\d+$/.test(String(v).trim()))){
+    const n = Number(v);
+    if(!Number.isFinite(n)) return null;
+    // Excel serial (days since 1899-12-30)
+    if(n > 20000 && n < 70000){
+      const base = new Date(Date.UTC(1899,11,30));
+      const d = new Date(base.getTime() + n*86400000);
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    }
+    // ms epoch
+    const d = new Date(n);
+    return isNaN(d)?null:new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+
+  const s = String(v).trim();
+
+  // ISO yyyy-mm-dd (opt time)
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m){ const y=+m[1], mo=+m[2]-1, d=+m[3]; const dt=new Date(y,mo,d); return isNaN(dt)?null:dt; }
+
+  // yyyy/mm/dd
+  m = s.match(/^(\d{4})[\/](\d{1,2})[\/](\d{1,2})$/);
+  if(m){ const y=+m[1], mo=+m[2]-1, d=+m[3]; const dt=new Date(y,mo,d); return isNaN(dt)?null:dt; }
+
+  // dd/mm/yyyy
+  m = s.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{4})$/);
+  if(m){ const d=+m[1], mo=+m[2]-1, y=+m[3]; const dt=new Date(y,mo,d); return isNaN(dt)?null:dt; }
+
+  // dd-mm-yyyy
+  m = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if(m){ const d=+m[1], mo=+m[2]-1, y=+m[3]; const dt=new Date(y,mo,d); return isNaN(dt)?null:dt; }
+
+  // dd/mm/yy
+  m = s.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{2})$/);
+  if(m){ const d=+m[1], mo=+m[2]-1, yy=+m[3]; const y = yy<=68 ? 2000+yy : 1900+yy; const dt=new Date(y,mo,d); return isNaN(dt)?null:dt; }
+
+  // dd-mm-yy
+  m = s.match(/^(\d{1,2})-(\d{1,2})-(\d{2})$/);
+  if(m){ const d=+m[1], mo=+m[2]-1, yy=+m[3]; const y = yy<=68 ? 2000+yy : 1900+yy; const dt=new Date(y,mo,d); return isNaN(dt)?null:dt; }
+
+  // dd-MMM-yyyy and dd MMM yyyy
+  m = s.match(/^(\d{1,2})[-\s]([A-Za-z]{3})[-\s](\d{4})$/);
+  if(m){
+    const monMap={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+    const d=+m[1], mo=monMap[m[2].toLowerCase()], y=+m[3];
+    if(mo!=null){ const dt=new Date(y,mo,d); return isNaN(dt)?null:dt; }
+  }
+
+  // MMM dd, yyyy
+  m = s.match(/^([A-Za-z]{3})\s+(\d{1,2}),\s*(\d{4})$/);
+  if(m){
+    const monMap={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+    const mo=monMap[m[1].toLowerCase()], d=+m[2], y=+m[3];
+    if(mo!=null){ const dt=new Date(y,mo,d); return isNaN(dt)?null:dt; }
+  }
+
+  const dt = new Date(s);
+  return isNaN(dt) ? null : new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+}
+
+function toDateOnly(v){ const d=parseDateFlexible(v); return d&& !isNaN(d) ? d : null; }
+function monthDays(y,m){ return new Date(y, m+1, 0).getDate(); }
+function fillSelect(sel, arr, map=(x)=>x){ sel.innerHTML=""; arr.forEach(v=>{ const o=document.createElement("option"); o.value=v; o.textContent=map(v); sel.appendChild(o); }); }
+function maxDate(rows,key){ let m=null; rows.forEach(r=>{ const d=toDateOnly(r[key]); if(d && (!m || d>m)) m=d; }); return m; }
+function debounce(fn, ms){ let t; return (...args)=>{ clearTimeout(t); t=setTimeout(()=>fn.apply(null,args), ms); }; }
+const mName = i => new Date(2000,i,1).toLocaleString(undefined,{month:"long"});
+
+// Build chronological index from data
+function buildDateIndex(){
+  dateIndex = {};
+  const dKey = ciFindKey(allRows[0], COL_DATE);
+  allRows.forEach(r=>{
+    const d = toDateOnly(r[dKey]);
+    if(!d) return;
+    const y=d.getFullYear(), m=d.getMonth(), day=d.getDate();
+    if(!dateIndex[y]) dateIndex[y]={};
+    if(!dateIndex[y][m]) dateIndex[y][m]=new Set();
+    dateIndex[y][m].add(day);
   });
-  metricSel.value = SNAPSHOT.metrics[0];
-
-  SNAPSHOT.labels.forEach(l => {
-    const opt = document.createElement('option'); opt.value = l; opt.textContent = l;
-    labelsSel.appendChild(opt);
-  });
+  yearsList = Object.keys(dateIndex).map(Number).sort((a,b)=>a-b);
 }
 
-function getFiltered(metric, wanted) {
-  let labels = SNAPSHOT.labels.slice();
-  let values = (SNAPSHOT.series[metric] || []).slice();
-  if (wanted && wanted.length) {
-    const set = new Set(wanted), L=[], V=[];
-    labels.forEach((lab,i)=>{ if(set.has(lab)){ L.push(lab); V.push(values[i]); }});
-    labels=L; values=V;
+// Months present in data for a year (chronological)
+function monthsForYear(y){ return dateIndex[y] ? Object.keys(dateIndex[y]).map(Number).sort((a,b)=>a-b) : []; }
+function daysForYM(y,m){ return (dateIndex[y] && dateIndex[y][m]) ? Array.from(dateIndex[y][m]).sort((a,b)=>a-b) : []; }
+
+// Provisional phases
+const PHASE_RANGES = { First:[1,7], Second:[8,14], Third:[15,21], Last:[22,31] };
+function phasesForYM(y,m){
+  const days = daysForYM(y,m);
+  const list=[];
+  for(const [ph,[a,b]] of Object.entries(PHASE_RANGES)){
+    if(days.some(d=>d>=a && d<=b)) list.push(ph);
   }
-  return {labels, values};
+  // If the month has no rows, still list all phases so user can pick — filter may return empty
+  return list.length ? list : ["First","Second","Third","Last"];
+}
+function computePhasesDatesFromIndex(year,month,phase){
+  const range = PHASE_RANGES[phase];
+  if(!range) return null;
+  const present = daysForYM(year,month).filter(d => d>=range[0] && d<=range[1]);
+  if(present.length){
+    return { from:new Date(year,month,present[0]), to:new Date(year,month,present[present.length-1]) };
+  }
+  // if no days exist in that phase for that month, use nominal bounds (still safe for filtering)
+  return { from:new Date(year,month,range[0]), to:new Date(year,month,Math.min(range[1], monthDays(year,month))) };
 }
 
-function renderChart(labels, values, metric) {
-  const ctx = document.getElementById('chartCanvas').getContext('2d');
-  if (_chartInstance && typeof _chartInstance.destroy === 'function') {
-    _chartInstance.destroy();
+/* filtering */
+function filterByTimeframe(mode){
+  const dKey = ciFindKey(allRows[0], COL_DATE);
+  const inR=(d,a,b)=>d>=a && d<=b;
+
+  if(mode==="day"){
+    const from=new Date(+dStartY.value,+dStartM.value,+dStartD.value);
+    const to=new Date(+dEndY.value,+dEndM.value,+dEndD.value);
+    return allRows.filter(r=>{ const d=toDateOnly(r[dKey]); return d && inR(d,from,to); });
   }
-  _chartInstance = new Chart(ctx, {
-    type: 'bar',
-    data: { labels, datasets:[{ label: metric, data: values }] },
-    options:{
-      responsive:true,
-      plugins:{
-        legend:{ labels:{ color:'#e9edf1' } },
-        tooltip:{ mode:'index', intersect:false }
-      },
-      scales:{
-        x:{ ticks:{color:'#e9edf1'}, grid:{color:'rgba(255,255,255,.08)'} },
-        y:{ ticks:{color:'#e9edf1'}, grid:{color:'rgba(255,255,255,.08)'} }
+  if(mode==="week"){
+    const a=computePhasesDatesFromIndex(+wStartY.value,+wStartM.value,wStartP.value);
+    const b=computePhasesDatesFromIndex(+wEndY.value,+wEndM.value,wEndP.value);
+    return allRows.filter(r=>{ const d=toDateOnly(r[dKey]); return d && inR(d,a.from,b.to); });
+  }
+  if(mode==="month"){
+    const from=new Date(+mStartY.value,+mStartM.value,1);
+    const to=new Date(+mEndY.value,+mEndM.value,monthDays(+mEndY.value,+mEndM.value));
+    return allRows.filter(r=>{ const d=toDateOnly(r[dKey]); return d && inR(d,from,to); });
+  }
+  if(mode==="year"){
+    const from=new Date(+yStartY.value,0,1), to=new Date(+yEndY.value,11,31);
+    return allRows.filter(r=>{ const d=toDateOnly(r[dKey]); return d && inR(d,from,to); });
+  }
+  return allRows.slice();
+}
+
+/* default slice */
+function buildDefaultSlice(sampleRow){
+  const lineKey   = ciFindKey(sampleRow, COL_LINE);
+  const energyKey = ciFindKey(sampleRow, COL_ENERGY);
+  const billKey   = ciFindKey(sampleRow, COL_BILL);
+  return {
+    rows:[{ uniqueName: lineKey }],
+    columns:[{ uniqueName: "Measures" }],
+    measures:[
+      { uniqueName: billKey,   aggregation:"sum", caption:"Sum of " + billKey },
+      { uniqueName: energyKey, aggregation:"sum", caption:"Sum of " + energyKey }
+    ]
+  };
+}
+
+/* chart mirroring */
+function renderChart(){
+  if(!pivot) return;
+  const rpt = pivot.getReport();
+  const rowsDef = (rpt.slice && rpt.slice.rows) ? rpt.slice.rows.slice() : [];
+  const measuresDef = (rpt.slice && rpt.slice.measures) ? rpt.slice.measures.slice() : [];
+
+  if(!measuresDef.length){
+    if(chartObj) chartObj.destroy();
+    document.getElementById("chart").innerHTML="";
+    return;
+  }
+
+  if(rowsDef.length === 0){
+    pivot.highcharts.getData({ type:"column" }, function(cfg){
+      if(cfg.series && cfg.series.length>=2){
+        cfg.yAxis=[{title:{text:cfg.series[0].name}},{title:{text:cfg.series[1].name},opposite:true}];
+        cfg.series[1].yAxis=1;
+      }
+      cfg.title={text:""};
+      if(chartObj) chartObj.destroy();
+      chartObj = Highcharts.chart("chart", cfg);
+    }, function(err){ console.error(err); });
+    return;
+  }
+
+  function resolveMeasure(row, m){
+    const want = (m.caption || m.uniqueName || "").toLowerCase();
+    const fallbacks = [
+      "sum of " + (m.uniqueName||""),
+      "total " + (m.uniqueName||""),
+      (m.uniqueName||"") + " (sum)",
+      "sum of " + (m.caption||"")
+    ].map(s=>s.toLowerCase());
+    const keys = Object.keys(row);
+    for(const k of keys){
+      const lk=k.toLowerCase();
+      if(lk===want || lk.includes(want) || fallbacks.some(f=>lk===f || lk.includes(f))){
+        const v=+row[k]; if(Number.isFinite(v)) return v;
       }
     }
-  });
+    const rowFields = rowsDef.map(r=>r.uniqueName.toLowerCase());
+    for(const k of keys){
+      const lk=k.toLowerCase();
+      if(rowFields.some(n=>lk===n || lk.includes(n))) continue;
+      const v=+row[k]; if(Number.isFinite(v)) return v;
+    }
+    return null;
+  }
+
+  pivot.getData({ type:"json", slice:rpt.slice }, function(res){
+    const data = (res && res.data) ? res.data : [];
+    const lvlKeys = rowsDef.map(r=>r.uniqueName);
+    const order = [];
+    const parents = {};
+
+    data.forEach(r=>{
+      const present = lvlKeys.map(k => r[ciFindKey(r,k)]);
+      const depth = present.filter(v => v!==undefined && v!==null && v!=="").length;
+      if(depth===0) return;
+
+      const pName = String(present[0]);
+      if(!(pName in parents)){
+        parents[pName] = { subtotal: null, children: [] };
+        order.push(pName);
+      }
+
+      const isLeaf = present.every(v => v!==undefined && v!==null && v!=="");
+      if(isLeaf){
+        parents[pName].children.push(r);
+      }else if(depth===1){
+        parents[pName].subtotal = r;
+      }
+    });
+
+    const categories = [];
+    const flatOrder = [];
+    order.forEach(p=>{
+      const grp = parents[p];
+      if(grp.children.length){
+        const childLabels = [];
+        grp.children.forEach(child=>{
+          const labelParts = lvlKeys.slice(1).map(k => child[ciFindKey(child,k)])
+            .filter(v => v!==undefined && v!==null && v!=="");
+          childLabels.push(String(labelParts.join(" – ")));
+          flatOrder.push({ row: child });
+        });
+        categories.push({ name: p, categories: childLabels });
+      }else if(grp.subtotal){
+        categories.push(String(p));
+        flatOrder.push({ row: grp.subtotal });
+      }
+    });
+
+    const series = measuresDef.map((m,i)=>({
+      name: m.caption || m.uniqueName,
+      type: "column",
+      data: flatOrder.map(o => {
+        const v = resolveMeasure(o.row, m);
+        return Number.isFinite(v) ? v : null;
+      }),
+      yAxis: (i===1 ? 1 : 0)
+    }));
+
+    const hasData = series.some(s => s.data.some(v => v !== null));
+    if(!hasData){
+      pivot.highcharts.getData({ type:"column" }, function(cfg){
+        if(cfg.series && cfg.series.length>=2){
+          cfg.yAxis=[{title:{text:cfg.series[0].name}},{title:{text:cfg.series[1].name},opposite:true}];
+          cfg.series[1].yAxis=1;
+        }
+        cfg.title={text:""};
+        if(chartObj) chartObj.destroy();
+        chartObj = Highcharts.chart("chart", cfg);
+      }, function(err){ console.error(err); });
+      return;
+    }
+
+    const yAxes=[{ title:{ text: measuresDef[0].caption || measuresDef[0].uniqueName } }];
+    if(measuresDef.length>=2){
+      yAxes.push({ title:{ text: measuresDef[1].caption || measuresDef[1].uniqueName }, opposite:true });
+    }
+
+    if(chartObj) chartObj.destroy();
+    chartObj = Highcharts.chart("chart", {
+      chart:{ type:"column" },
+      title:{ text:"" },
+      xAxis:{ categories },
+      yAxis: yAxes,
+      series
+    });
+  }, function(err){ console.error(err); });
+}
+const rerenderChart = debounce(renderChart, 120);
+
+function applyTimeframeAndRefresh(){
+  const mode=tfMode.value;
+  const filtered = filterByTimeframe(mode);
+  const rpt = pivot.getReport();
+  rpt.dataSource = { data: filtered.length ? filtered : allRows };
+  pivot.setReport(rpt);
 }
 
-function renderTable(labels, values, metric){
-  document.getElementById('th-metric').textContent = metric;
-  const tbody=document.getElementById('tbody'); tbody.innerHTML='';
-  labels.forEach((lab,i)=>{
-    const tr=document.createElement('tr');
-    tr.innerHTML = `<td>${lab}</td><td>${(values[i]??'').toLocaleString()}</td>`;
-    tbody.appendChild(tr);
-  });
+function setDefaultDateView(){
+  const dKey = ciFindKey(allRows[0], COL_DATE);
+  const last = maxDate(allRows, dKey);
+  viewRows = last ? allRows.filter(r=>{ const d=toDateOnly(r[dKey]); return d && d.getTime()===last.getTime(); }) : allRows.slice();
 }
 
-async function refresh(){
-  const metric = document.getElementById('metric').value;
-  const wanted = Array.from(document.getElementById('labels').selectedOptions).map(o=>o.value);
-  const {labels, values} = getFiltered(metric, wanted);
-  renderChart(labels, values, metric);
-  renderTable(labels, values, metric);
+/* ---------- FULL chronological pickers (all months always visible) ---------- */
+function populateTimeframePickers(){
+  if(!yearsList.length) return;
+  const monthsAll = Array.from({length:12},(_,i)=>i);
+  const mLabel = mName;
+
+  // years in all panels
+  ["dStartY","dEndY","wStartY","wEndY","mStartY","mEndY","yStartY","yEndY"]
+    .forEach(id=>fillSelect(document.getElementById(id), yearsList));
+
+  // months ALWAYS 0..11 for start and end (day/week/month panels)
+  ["dStartM","dEndM","wStartM","wEndM","mStartM","mEndM"]
+    .forEach(id=>fillSelect(document.getElementById(id), monthsAll, mLabel));
+
+  // days will be data-driven for selected Y/M
+  function refreshDay(prefix){
+    const y=+document.getElementById(prefix+"Y").value;
+    const m=+document.getElementById(prefix+"M").value;
+    const days = daysForYM(y,m);
+    // if month has no data, show nominal month length so you can pick (filter may return empty)
+    const list = days.length ? days : Array.from({length:monthDays(y,m)},(_,i)=>i+1);
+    fillSelect(document.getElementById(prefix+"D"), list);
+    // chronological defaults: start=first, end=last
+    document.getElementById(prefix+"D").value = prefix.includes("End") ? list[list.length-1] : list[0];
+  }
+
+  // Week phases list (provisional). If no data → still show all phases.
+  function refreshWeek(prefix){
+    const y=+document.getElementById(prefix+"Y").value;
+    const m=+document.getElementById(prefix+"M").value;
+    const phases = phasesForYM(y,m);
+    fillSelect(document.getElementById(prefix+"P"), phases);
+    document.getElementById(prefix+"P").value = prefix.includes("End") ? phases[phases.length-1] : phases[0];
+  }
+
+  // chronological default years
+  const firstYear = yearsList[0];
+  const lastYear  = yearsList[yearsList.length-1];
+
+  // set defaults
+  document.getElementById("dStartY").value = firstYear;
+  document.getElementById("dEndY").value   = lastYear;
+  document.getElementById("wStartY").value = firstYear;
+  document.getElementById("wEndY").value   = lastYear;
+  document.getElementById("mStartY").value = firstYear;
+  document.getElementById("mEndY").value   = lastYear;
+  // start month = January, end month = December
+  document.getElementById("dStartM").value = 0;
+  document.getElementById("dEndM").value   = 11;
+  document.getElementById("wStartM").value = 0;
+  document.getElementById("wEndM").value   = 11;
+  document.getElementById("mStartM").value = 0;
+  document.getElementById("mEndM").value   = 11;
+
+  refreshDay("dStart"); refreshDay("dEnd");
+  refreshWeek("wStart"); refreshWeek("wEnd");
+
+  // wiring
+  ["dStartY","dStartM"].forEach(id=>document.getElementById(id).onchange=()=>refreshDay("dStart"));
+  ["dEndY","dEndM"].forEach(id=>document.getElementById(id).onchange=()=>refreshDay("dEnd"));
+  ["wStartY","wStartM"].forEach(id=>document.getElementById(id).onchange=()=>refreshWeek("wStart"));
+  ["wEndY","wEndM"].forEach(id=>document.getElementById(id).onchange=()=>refreshWeek("wEnd"));
+
+  // year panel start/end defaults
+  document.getElementById("yStartY").value = firstYear;
+  document.getElementById("yEndY").value   = lastYear;
+}
+
+function showTfSection(mode){
+  document.querySelectorAll(".tf").forEach(el=>el.style.display="none");
+  const sec = document.querySelector(".tf-"+mode);
+  if(sec) sec.style.display="";
 }
 
 (async function init(){
-  try {
-    await loadData();
-    fillControls();
-    document.getElementById('metric').addEventListener('change', refresh);
-    document.getElementById('labels').addEventListener('change', refresh);
-    await refresh();
-  } catch(e) {
-    alert(e);
+  try{
+    const r = await fetch(DATA_URL, { cache:"no-store" });
+    if(!r.ok) throw new Error("Failed to fetch JSON ("+r.status+")");
+    const payload = await r.json();
+    allRows = (payload && payload.record && Array.isArray(payload.record.rows)) ? payload.record.rows : [];
+    if(!allRows.length) throw new Error("No flat rows in JSONBin");
+
+    buildDateIndex();               // ← builds 2024, 2025, etc.
+    setDefaultDateView();
+    const slice = buildDefaultSlice(allRows[0]);
+
+    pivot = new WebDataRocks({
+      container:"#wdr",
+      height:520,
+      toolbar:true,
+      report:{
+        dataSource:{ data:viewRows },
+        slice,
+        options:{ grid:{ type:"classic", showTotals:"rows", showGrandTotals:"rows", showHeaders:true } }
+      },
+      customizeToolbar: tb => { tb.getTabs = () => []; },
+      reportcomplete: function(){
+        pivot.off("reportcomplete");
+        pivot.openFieldsList();
+        const panel  = document.querySelector(".wdr-fields-panel");
+        const holder = document.getElementById("fieldsPanel");
+        if(panel && holder && !holder.contains(panel)){ holder.appendChild(panel); panel.style.height="520px"; }
+        pivot.on("aftergriddraw", rerenderChart);
+        rerenderChart();
+      },
+      reportchange: function(){ rerenderChart(); }
+    });
+
+    populateTimeframePickers(); // ← months always Jan..Dec (both start & end), years chronological
+    showTfSection("day");
+
+    tfMode.onchange  = () => showTfSection(tfMode.value);
+    btnApply.onclick = () => applyTimeframeAndRefresh();
+    btnExcel.onclick = () => pivot.exportTo("excel", { filename:"pivot_table" });
+    btnPDF.onclick   = () => { if(chartObj) chartObj.exportChart({ type:"application/pdf", filename:"pivot_chart" }); };
+
+  }catch(e){
+    alert(e.message || e);
     console.error(e);
   }
 })();
