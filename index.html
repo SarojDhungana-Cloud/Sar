@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Energy Pivot Dashboard</title>
+<title>Pivot Dashboard — Recommendations + Combo + Two Timeframes</title>
 
 <link rel="stylesheet" href="https://cdn.webdatarocks.com/latest/webdatarocks.min.css"/>
 <script src="https://cdn.webdatarocks.com/latest/webdatarocks.js"></script>
@@ -13,53 +13,65 @@
 <script src="https://cdn.webdatarocks.com/latest/webdatarocks.highcharts.js"></script>
 
 <style>
-  :root { --bg:#0b1020; --card:#0f1530; --text:#e9edf1; --muted:#94a3b8; --excel-grid:#f3f6fb; --excel-lines:#e6ecf5; }
+  :root { --bg:#0b1020; --card:#0f1530; --text:#e9edf1; --muted:#94a3b8; --excel-grid:#f3f6fb; --excel-lines:#e6ecf5; --accent:#1b3cb3; }
   html,body { height:100%; }
-  body { margin:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; }
-
-  /* === WIDEN PAGE TO FULL WIDTH === */
-  .wrap {
-    width:100vw;           /* occupy the full viewport width */
-    max-width:none;        /* remove any max width cap */
-    margin:16px 0;         /* minimal vertical margin */
-    padding:0 8px;         /* small breathing room on the edges */
-    box-sizing:border-box; /* include padding in width */
-  }
-
+  body { margin:0; padding-bottom:10px; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; }
+  .wrap { width:100vw; margin:16px 0; padding:0 8px; box-sizing:border-box; }
   .card { background:var(--card); border-radius:14px; padding:14px 16px; box-shadow:0 10px 30px rgba(0,0,0,.25); }
-  .row { display:flex; flex-wrap:wrap; gap:16px; }
+  .row { display:flex; flex-wrap:wrap; gap:16px; align-items:flex-end; }
   .col { flex:1; min-width:220px; }
-  .muted { color:var(--muted); }
-  .btn { background:#1b3cb3; color:#fff; border:none; border-radius:10px; padding:8px 12px; cursor:pointer; }
-  .btn.secondary { background:#2b365e; }
-  .fieldset { display:grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap:10px; }
-  .field { display:flex; flex-direction:column; gap:6px; }
   .label { font-size:12px; color:var(--muted); }
-  select, input[type="text"], input[type="number"] { width:100%; padding:8px 10px; border-radius:10px; border:1px solid #1e2a5a; background:#0c1230; color:#e9edf1; }
+  .btn { background:var(--accent); color:#fff; border:none; border-radius:10px; padding:8px 12px; cursor:pointer; }
+  .btn.secondary { background:#2b365e; }
 
-  /* Use one full-width column (right panel removed earlier) */
-  .main { display:grid; grid-template-columns: 1fr; gap:16px; margin-top:16px; }
+  select,input[type="text"],input[type="number"]{ width:100%; padding:8px 10px; border-radius:10px; border:1px solid #1e2a5a; background:#0c1230; color:#e9edf1; }
 
   #wdr {
+    height:520px;
+    border-radius:12px;
     background:
       linear-gradient(var(--excel-lines) 1px, transparent 1px) 0 0/100% 22px,
       linear-gradient(90deg, var(--excel-lines) 1px, transparent 1px) 0 0/120px 100%,
       var(--excel-grid);
-    border-radius:12px;
   }
+  #wdr .wdr-grid-layout, #wdr .wdr-header, #wdr .wdr-cell { font-size:14px !important; }
 
-  /* Chart title bar */
-  #chartTitleBar { display:flex; align-items:flex-end; gap:12px; margin-top:12px; flex-wrap:wrap; }
-  #chartTitleDisplay { font-weight:700; margin-top:8px; }
+  #chartTitleBar { display:flex; flex-wrap:wrap; gap:12px; margin-top:12px; }
+  #chartTitleDisplay { font-weight:700; margin:6px 0 2px; }
+  #chart { height: calc(100vh - 430px); margin: 0 0 8px 0; }
+  @media (max-height: 800px) { #chart { height: 420px; } }
+
+  .highcharts-axis-labels text, .highcharts-legend-item text { font-size:14px !important; }
+
+  /* Combo designer (hidden by default) */
+  #comboPanelWrap { display:none; margin-top:12px; background:#0d1434; border-radius:12px; padding:12px; }
+  #comboPanel { margin-top:10px; display:grid; gap:8px; }
+  #comboPanel .srow { display:grid; grid-template-columns: 1fr 140px 140px; gap:8px; align-items:center; }
+  #comboPanel .name { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  /* Recommended charts modal */
+  #recModal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:9999; align-items:center; justify-content:center; }
+  #recBox { width:min(920px, 92vw); background:#0e1432; border-radius:16px; padding:16px; box-shadow:0 20px 60px rgba(0,0,0,.4); }
+  #recHeader { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  #recGrid { display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px; }
+  .recCard { background:#0b1130; border:1px solid #1e2a5a; border-radius:12px; padding:10px; cursor:pointer; transition:transform .1s ease, border-color .1s ease; }
+  .recCard:hover { transform: translateY(-2px); border-color:#2b3fb0; }
+  .recTitle { font-weight:600; margin-bottom:6px; font-size:14px; }
+  .recDescr { color:#9aa3bf; font-size:12px; }
+
+  /* Second timeframe panel */
+  #tf2Wrap { display:none; margin-top:10px; border-top:1px dashed #26316a; padding-top:12px; }
+  .subhead { font-weight:700; margin:0 0 6px; font-size:14px; color:#c9d3ff; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="row" style="align-items:center;">
     <h1 style="margin:0; font-size:22px;">Energy Pivot Dashboard</h1>
-    <div class="muted" style="margin-left:auto; font-size:12px;">Live from JSONBin</div>
+    <div style="margin-left:auto; font-size:12px; color:#94a3b8;">WebDataRocks + Highcharts</div>
   </div>
 
+  <!-- Timeframe controls -->
   <div class="card" style="margin-top:12px;">
     <div class="row">
       <div class="col">
@@ -72,293 +84,670 @@
         </select>
       </div>
 
-      <!-- Day -->
+      <!-- Day (T1) -->
       <div class="col tf tf-day">
-        <div class="fieldset">
-          <div class="field"><div class="label">Start Year</div><select id="dStartY"></select></div>
-          <div class="field"><div class="label">Start Month</div><select id="dStartM"></select></div>
-          <div class="field"><div class="label">Start Day</div><select id="dStartD"></select></div>
-          <div class="field"><div class="label">End Year</div><select id="dEndY"></select></div>
-          <div class="field"><div class="label">End Month</div><select id="dEndM"></select></div>
-          <div class="field"><div class="label">End Day</div><select id="dEndD"></select></div>
+        <div class="label">Start</div>
+        <div class="row">
+          <div class="col"><select id="dStartY"></select></div>
+          <div class="col"><select id="dStartM"></select></div>
+          <div class="col"><select id="dStartD"></select></div>
+        </div>
+      </div>
+      <div class="col tf tf-day">
+        <div class="label">End</div>
+        <div class="row">
+          <div class="col"><select id="dEndY"></select></div>
+          <div class="col"><select id="dEndM"></select></div>
+          <div class="col"><select id="dEndD"></select></div>
         </div>
       </div>
 
-      <!-- Hidden (kept for completeness) -->
+      <!-- Week (T1) -->
       <div class="col tf tf-week" style="display:none;">
-        <div class="fieldset">
-          <div class="field"><div class="label">Start Year</div><select id="wStartY"></select></div>
-          <div class="field"><div class="label">Start Month</div><select id="wStartM"></select></div>
-          <div class="field"><div class="label">Start Phase</div><select id="wStartP"></select></div>
-          <div class="field"><div class="label">End Year</div><select id="wEndY"></select></div>
-          <div class="field"><div class="label">End Month</div><select id="wEndM"></select></div>
-          <div class="field"><div class="label">End Phase</div><select id="wEndP"></select></div>
+        <div class="label">Start (Year / Month / Week-in-month)</div>
+        <div class="row">
+          <div class="col"><select id="wStartY"></select></div>
+          <div class="col"><select id="wStartM"></select></div>
+          <div class="col"><select id="wStartP"></select></div>
+        </div>
+      </div>
+      <div class="col tf tf-week" style="display:none;">
+        <div class="label">End (Year / Month / Week-in-month)</div>
+        <div class="row">
+          <div class="col"><select id="wEndY"></select></div>
+          <div class="col"><select id="wEndM"></select></div>
+          <div class="col"><select id="wEndP"></select></div>
         </div>
       </div>
 
+      <!-- Month (T1) -->
       <div class="col tf tf-month" style="display:none;">
-        <div class="fieldset">
-          <div class="field"><div class="label">Start Year</div><select id="mStartY"></select></div>
-          <div class="field"><div class="label">Start Month</div><select id="mStartM"></select></div>
-          <div class="field"><div class="label">End Year</div><select id="mEndY"></select></div>
-          <div class="field"><div class="label">End Month</div><select id="mEndM"></select></div>
+        <div class="label">Start (Year / Month)</div>
+        <div class="row">
+          <div class="col"><select id="mStartY"></select></div>
+          <div class="col"><select id="mStartM"></select></div>
+        </div>
+      </div>
+      <div class="col tf tf-month" style="display:none;">
+        <div class="label">End (Year / Month)</div>
+        <div class="row">
+          <div class="col"><select id="mEndY"></select></div>
+          <div class="col"><select id="mEndM"></select></div>
         </div>
       </div>
 
+      <!-- Year (T1) -->
       <div class="col tf tf-year" style="display:none;">
-        <div class="fieldset">
-          <div class="field"><div class="label">Start Year</div><select id="yStartY"></select></div>
-          <div class="field"><div class="label">End Year</div><select id="yEndY"></select></div>
-        </div>
+        <div class="label">Start Year</div>
+        <select id="yStartY"></select>
+      </div>
+      <div class="col tf tf-year" style="display:none;">
+        <div class="label">End Year</div>
+        <select id="yEndY"></select>
       </div>
 
-      <div class="col" style="display:flex; gap:10px; align-items:end;">
+      <div class="col" style="display:flex; gap:10px; flex-wrap:wrap;">
         <button id="btnApply" class="btn">Apply Timeframe</button>
         <button id="btnExcel" class="btn secondary">Download Excel</button>
         <button id="btnPDF" class="btn secondary">Download PDF</button>
+        <!-- Twin controls -->
+        <button id="btnTwin" class="btn">Two Timeframes</button>
+        <button id="btnT1Only" class="btn secondary">Apply T1 Only</button>
+        <button id="btnT2Only" class="btn secondary">Apply T2 Only</button>
+        <button id="btnBoth" class="btn">Apply Both</button>
+      </div>
+    </div>
+
+    <!-- Second timeframe panel (T2) -->
+    <div id="tf2Wrap">
+      <div class="subhead">Second Timeframe (T2)</div>
+      <div class="row">
+        <div class="col">
+          <div class="label">Timeframe (locked to the same mode)</div>
+          <input type="text" value="Same as above" disabled/>
+        </div>
+
+        <!-- Day (T2) -->
+        <div class="col tf2 tf-day">
+          <div class="label">Start</div>
+          <div class="row">
+            <div class="col"><select id="d2StartY"></select></div>
+            <div class="col"><select id="d2StartM"></select></div>
+            <div class="col"><select id="d2StartD"></select></div>
+          </div>
+        </div>
+        <div class="col tf2 tf-day">
+          <div class="label">End</div>
+          <div class="row">
+            <div class="col"><select id="d2EndY"></select></div>
+            <div class="col"><select id="d2EndM"></select></div>
+            <div class="col"><select id="d2EndD"></select></div>
+          </div>
+        </div>
+
+        <!-- Week (T2) -->
+        <div class="col tf2 tf-week" style="display:none;">
+          <div class="label">Start (Year / Month / Week-in-month)</div>
+          <div class="row">
+            <div class="col"><select id="w2StartY"></select></div>
+            <div class="col"><select id="w2StartM"></select></div>
+            <div class="col"><select id="w2StartP"></select></div>
+          </div>
+        </div>
+        <div class="col tf2 tf-week" style="display:none;">
+          <div class="label">End (Year / Month / Week-in-month)</div>
+          <div class="row">
+            <div class="col"><select id="w2EndY"></select></div>
+            <div class="col"><select id="w2EndM"></select></div>
+            <div class="col"><select id="w2EndP"></select></div>
+          </div>
+        </div>
+
+        <!-- Month (T2) -->
+        <div class="col tf2 tf-month" style="display:none;">
+          <div class="label">Start (Year / Month)</div>
+          <div class="row">
+            <div class="col"><select id="m2StartY"></select></div>
+            <div class="col"><select id="m2StartM"></select></div>
+          </div>
+        </div>
+        <div class="col tf2 tf-month" style="display:none;">
+          <div class="label">End (Year / Month)</div>
+          <div class="row">
+            <div class="col"><select id="m2EndY"></select></div>
+            <div class="col"><select id="m2EndM"></select></div>
+          </div>
+        </div>
+
+        <!-- Year (T2) -->
+        <div class="col tf2 tf-year" style="display:none;">
+          <div class="label">Start Year</div>
+          <select id="y2StartY"></select>
+        </div>
+        <div class="col tf2 tf-year" style="display:none;">
+          <div class="label">End Year</div>
+          <select id="y2EndY"></select>
+        </div>
       </div>
     </div>
   </div>
 
-  <div class="main">
-    <div class="card">
-      <div id="wdr" style="height:520px;"></div>
+  <!-- Pivot + Chart -->
+  <div class="card">
+    <div id="wdr"></div>
 
-      <!-- Chart controls -->
-      <div id="chartTitleBar">
-        <div class="col" style="flex:1; min-width:260px;">
-          <div class="label">Chart title (leave blank to auto-generate)</div>
-          <input id="chartTitleInput" type="text" placeholder="Custom chart title"/>
-        </div>
-        <div class="col" style="max-width:220px;">
-          <div class="label">Chart type</div>
-          <select id="chartType">
-            <option value="column" selected>Column</option>
-            <option value="column-stacked">Stacked Column</option>
-            <option value="line">Line</option>
-            <option value="area">Area</option>
-            <option value="bar">Bar</option>
-          </select>
-        </div>
-        <div class="col" style="max-width:160px;">
-          <div class="label">&nbsp;</div>
-          <label style="font-size:13px; display:flex; align-items:center; gap:8px;">
-            <input id="toggleLabels" type="checkbox" style="width:16px; height:16px;"/> Show data labels
-          </label>
-        </div>
-        <div class="col" style="max-width:140px;">
-          <div class="label">Title size (px)</div>
-          <input id="chartTitleSize" type="number" min="10" max="40" step="1" value="16"/>
-        </div>
-        <div class="col" style="max-width:140px; display:flex; align-items:flex-end;">
-          <button id="btnApplyChart" class="btn secondary" style="width:100%;">Apply</button>
-        </div>
+    <div id="chartTitleBar">
+      <div class="col" style="flex:1; min-width:260px;">
+        <div class="label">Chart title (leave blank to auto)</div>
+        <input id="chartTitleInput" type="text" placeholder="Custom chart title"/>
       </div>
-
-      <div id="chartTitleDisplay"></div>
-      <div id="chart" style="height:420px; margin-top:6px;"></div>
+      <div class="col" style="max-width:220px;">
+        <div class="label">Default chart type</div>
+        <select id="chartType">
+          <option value="column" selected>Column</option>
+          <option value="line">Line</option>
+          <option value="spline">Spline</option>
+          <option value="area">Area</option>
+          <option value="bar">Bar</option>
+        </select>
+      </div>
+      <div class="col" style="max-width:160px;">
+        <div class="label">&nbsp;</div>
+        <label style="font-size:13px; display:flex; align-items:center; gap:8px;">
+          <input id="toggleLabels" type="checkbox" style="width:16px; height:16px;"/> Show data labels
+        </label>
+      </div>
+      <div class="col" style="max-width:140px;">
+        <div class="label">Title size (px)</div>
+        <input id="chartTitleSize" type="number" min="10" max="40" step="1" value="16"/>
+      </div>
+      <div class="col" style="max-width:340px; display:flex; gap:8px;">
+        <button id="btnApplyChart" class="btn secondary">Apply</button>
+        <button id="btnRecommend" class="btn">Recommended Charts</button>
+        <button id="btnToggleCombo" class="btn secondary">Combo</button>
+      </div>
     </div>
+
+    <!-- Combo designer -->
+    <div id="comboPanelWrap" class="card">
+      <div class="label" style="margin-bottom:6px;">Combo chart options (per series)</div>
+      <div id="comboPanel"></div>
+      <div style="margin-top:8px; display:flex; gap:8px;">
+        <button id="btnApplyCombo" class="btn secondary">Apply Combo</button>
+        <div style="font-size:12px; color:#94a3b8;">Tip: T1 (Left axis) vs T2 (Right axis) auto-mapped on Apply Both.</div>
+      </div>
+    </div>
+
+    <div id="chartTitleDisplay"></div>
+    <div id="chart"></div>
+  </div>
+</div>
+
+<!-- Recommended Charts modal -->
+<div id="recModal">
+  <div id="recBox">
+    <div id="recHeader">
+      <div style="font-weight:700;">Recommended Pivot Charts</div>
+      <button id="recClose" class="btn secondary">Close</button>
+    </div>
+    <div class="label" style="margin-bottom:8px;">Choose a chart layout preset (Excel-style suggestions):</div>
+    <div id="recGrid"></div>
   </div>
 </div>
 
 <script>
-const DATA_URL = "https://api.jsonbin.io/v3/b/68d62f76ae596e708ffc3c1a/latest";
+const DATA_URL = "https://imloololrtufqywapowk.supabase.co/storage/v1/object/public/energy-dashboard/rows.json";
 
-const COL_DATE   = "Traded Date";
-const COL_LINE   = "Line";
-const COL_ENERGY = "Traded Energy";
-const COL_BILL   = "Net Bill in NPR";
+/* Column guesses (adjust if needed) */
+const GUESS_DATE = ["Traded Date","Date","Transaction Date","DATE"];
+const GUESS_LINE = ["Line","Category","Subcategory","Market","Segment"];
 
-/* Independent fields for date parts */
-const COL_DAY   = "Traded Date.Day";
-const COL_MONTH = "Traded Date.Month";
-const COL_YEAR  = "Traded Date.Year";
+/* Derived date parts */
+const D = { DAY:"Day", MONTH:"Month", YEAR:"Year", WEEKAD:"WeekAD", MONTHAD:"MonthAD", TF:"Timeframe" };
 
 let pivot=null, allRows=[], enrichedRows=[], chartObj=null;
-let DATE_KEY="", ENERGY_KEY="", BILL_KEY="";
+let DATE_KEY="", LINE_KEY="";
+const seriesSettings = {}; // { name:{type, axis} }
+let twoTFEnabled = false;   // governs grid split/columns
 
-/* ------------ helpers ------------ */
-function ciFindKey(obj,wanted){
-  const keys = Object.keys(obj||{});
-  const exact = keys.find(k => k.toLowerCase() === wanted.toLowerCase());
-  if (exact) return exact;
-  return keys.find(k => k.toLowerCase().includes(wanted.toLowerCase())) || wanted;
-}
+/* ---------- helpers ---------- */
+const ciFind = (obj, wanted)=>Object.keys(obj||{}).find(k=>k.toLowerCase()===wanted.toLowerCase()) || Object.keys(obj||{}).find(k=>k.toLowerCase().includes(wanted.toLowerCase()));
+const findAny = (obj, list)=>list.map(x=>ciFind(obj,x)).find(Boolean) || list[0];
+
 function parseDateFlexible(v){
   if(v==null) return null;
-  if(v instanceof Date && !isNaN(v)) return new Date(v.getFullYear(), v.getMonth(), v.getDate());
-  if(typeof v==="number" || (/^\d+$/.test(String(v).trim()))){
-    const n = Number(v);
-    if(n > 20000 && n < 70000){
-      const base = new Date(Date.UTC(1899,11,30));
-      const d = new Date(base.getTime() + n*86400000);
-      return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    }
-    const d = new Date(n);
-    return isNaN(d)?null:new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  }
-  const s = String(v).trim();
-  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-  if(m){ const y=+m[1], mo=+m[2]-1, d=+m[3]; const dt=new Date(y,mo,d); return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()); }
-  m = s.match(/^(\d{4})[\/](\d{1,2})[\/](\d{1,2})$/);
-  if(m){ const y=+m[1], mo=+m[2]-1, d=+m[3]; const dt=new Date(y,mo,d); return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()); }
-  m = s.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{4})$/);
-  if(m){ const d=+m[1], mo=+m[2]-1, y=+m[3]; const dt=new Date(y,mo,d); return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()); }
-  m = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
-  if(m){ const d=+m[1], mo=+m[2]-1, y=+m[3]; const dt=new Date(y,mo,d); return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()); }
-  m = s.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{2})$/);
-  if(m){ const d=+m[1], mo=+m[2]-1, yy=+m[3]; const y = yy<=68 ? 2000+yy : 1900+yy; const dt=new Date(y,mo,d); return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()); }
-  m = s.match(/^(\d{1,2})-(\d{1,2})-(\d{2})$/);
-  if(m){ const d=+m[1], mo=+m[2]-1, yy=+m[3]; const y = yy<=68 ? 2000+yy : 1900+yy; const dt=new Date(y,mo,d); return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()); }
-  m = s.match(/^(\d{1,2})[-\s]([A-Za-z]{3})[-\s](\d{4})$/);
-  if(m){
-    const monMap={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
-    const d=+m[1], mo=monMap[m[2].toLowerCase()], y=+m[3];
-    if(mo!=null){ const dt=new Date(y,mo,d); return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()); }
-  }
-  m = s.match(/^([A-Za-z]{3})\s+(\d{1,2}),\s*(\d{4})$/);
-  if(m){
-    const monMap={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
-    const mo=monMap[m[1].toLowerCase()], d=+m[2], y=+m[3];
-    if(mo!=null){ const dt=new Date(y,mo,d); return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()); }
-  }
-  const dt = new Date(s);
-  return isNaN(dt) ? null : new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+  if(v instanceof Date && !isNaN(v)) return new Date(v.getFullYear(),v.getMonth(),v.getDate());
+  if(typeof v==="number" && v>20000 && v<70000){ const base=new Date(Date.UTC(1899,11,30)); const d=new Date(base.getTime()+v*86400000); return new Date(d.getFullYear(),d.getMonth(),d.getDate()); }
+  const s=String(v).trim();
+  let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(m) return new Date(+m[1],+m[2]-1,+m[3]);
+  m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); if(m) return new Date(+m[3],+m[2]-1,+m[1]);
+  m=s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/); if(m) return new Date(+m[3],+m[2]-1,+m[1]);
+  const d=new Date(s); return isNaN(d)?null:new Date(d.getFullYear(),d.getMonth(),d.getDate());
 }
-function toDateOnly(v){ const d=parseDateFlexible(v); return d && !isNaN(d) ? d : null; }
-function monthDays(y,m){ return new Date(y, m+1, 0).getDate(); }
-function fillSelect(sel, arr, map=(x)=>x){ sel.innerHTML=""; arr.forEach(v=>{ const o=document.createElement("option"); o.value=v; o.textContent=map(v); sel.appendChild(o); }); }
-function maxDate(rows,key){ let m=null; rows.forEach(r=>{ const d=toDateOnly(r[key]); if(d && (!m || d>m)) m=d; }); return m; }
-function addDays(d, n){ const x=new Date(d); x.setDate(x.getDate()+n); return new Date(x.getFullYear(),x.getMonth(),x.getDate()); }
-const fmtDate = d => d ? d.toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"}) : "";
+const toDateOnly=v=>{const d=parseDateFlexible(v);return d&&!isNaN(d)?d:null;}
+const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return new Date(x.getFullYear(),x.getMonth(),x.getDate());}
+const monthDays=(y,m)=>new Date(y,m+1,0).getDate();
+const monthLabel=i=>new Date(2000,i,1).toLocaleString(undefined,{month:"long"});
+const fmtDate=d=>d?d.toLocaleDateString(undefined,{day:"2-digit",month:"2-digit",year:"numeric"}):"";
+const weekPhase=d=>["First","Second","Third","Last"][Math.min(3,Math.floor((d.getDate()-1)/7))];
 
-/* --------- Enrich rows with independent date parts (Day/Month/Year) --------- */
-function enrichWithDateParts(rows, dateKey){
+function enrich(rows, dateKey){
   return rows.map(r=>{
-    const copy = Object.assign({}, r);
-    const d = toDateOnly(r[dateKey]);
-    if (d){
-      copy[COL_DAY]   = d.getDate();
-      copy[COL_MONTH] = new Date(2000,d.getMonth(),1).toLocaleString(undefined,{month:"long"});
-      copy[COL_YEAR]  = d.getFullYear();
-    } else {
-      copy[COL_DAY]   = null;
-      copy[COL_MONTH] = null;
-      copy[COL_YEAR]  = null;
+    const d=toDateOnly(r[dateKey]); const out=Object.assign({},r);
+    if(d){
+      out[D.DAY]=d.getDate();
+      out[D.MONTH]=new Date(2000,d.getMonth(),1).toLocaleString(undefined,{month:"long"});
+      out[D.YEAR]=d.getFullYear();
+      out[D.WEEKAD]=out[D.MONTH]+": "+weekPhase(d);
+      out[D.MONTHAD]=out[D.YEAR]+": "+out[D.MONTH];
     }
-    return copy;
+    return out;
   });
 }
 
-/* ---------- DEFAULT FIELDS ---------- */
-function buildDefaultSlice(){
+function detectNumericMeasures(row){
+  const bad = new Set([D.DAY.toLowerCase(),D.MONTH.toLowerCase(),D.YEAR.toLowerCase(),D.WEEKAD.toLowerCase(),D.MONTHAD.toLowerCase(),D.TF.toLowerCase()]);
+  return Object.keys(row).filter(k=>{
+    const v=row[k]; const lower=k.toLowerCase();
+    const numeric = typeof v==="number" || (!isNaN(parseFloat(v)) && isFinite(v));
+    const probablyDate = /date|year|month|day|timeframe/.test(lower);
+    return numeric && !bad.has(lower) && !probablyDate;
+  });
+}
+
+/* ---------- timeframe helpers ---------- */
+function selectedRangeFrom(prefix, mode){
+  if(mode==="week"){
+    const y1=+document.getElementById(prefix+"StartY").value,
+          m1=+document.getElementById(prefix+"StartM").value,
+          p1= document.getElementById(prefix+"StartP").value;
+    const y2=+document.getElementById(prefix+"EndY").value,
+          m2=+document.getElementById(prefix+"EndM").value,
+          p2= document.getElementById(prefix+"EndP").value;
+    const md=(y,m,p)=>({First:1,Second:8,Third:15,Last:Math.max(1,monthDays(y,m)-6)})[p]||1;
+    const s1=new Date(y1,m1, md(y1,m1,p1));
+    const s2=new Date(y2,m2, md(y2,m2,p2));
+    const e2=addDays(s2,6); const eom=new Date(y2,m2, monthDays(y2,m2));
+    return {min:s1, max: p2==="Last"? eom : (e2>eom? eom : e2)};
+  }
+  if(mode==="month"){
+    const y1=+document.getElementById(prefix+"StartY").value,
+          m1=+document.getElementById(prefix+"StartM").value,
+          y2=+document.getElementById(prefix+"EndY").value,
+          m2=+document.getElementById(prefix+"EndM").value;
+    return {min:new Date(y1,m1,1), max:new Date(y2,m2, monthDays(y2,m2))};
+  }
+  if(mode==="year"){
+    const y1=+document.getElementById(prefix+"StartY").value,
+          y2=+document.getElementById(prefix+"EndY").value;
+    return {min:new Date(y1,0,1), max:new Date(y2,11,31)};
+  }
+  // day
+  const y1=+document.getElementById(prefix+"StartY").value,
+        m1=+document.getElementById(prefix+"StartM").value,
+        d1=+document.getElementById(prefix+"StartD").value,
+        y2=+document.getElementById(prefix+"EndY").value,
+        m2=+document.getElementById(prefix+"EndM").value,
+        d2=+document.getElementById(prefix+"EndD").value;
+  return {min:new Date(y1,m1,d1), max:new Date(y2,m2,d2)};
+}
+
+/* ---------- title ---------- */
+function updateTitle(){
+  const s=(chartTitleInput.value||"").trim();
+  const mode=tfMode.value;
+  const p1 = mode==="day"?"d":(mode==="week"?"w":(mode==="month"?"m":"y"));
+  const r1 = selectedRangeFrom(p1, mode);
+  const by = mode==="week" ? "Week" : mode==="month" ? "Month" : mode==="year" ? "Year" : "Day";
+  let t = s || `By ${by} from ${fmtDate(r1.min)} to ${fmtDate(r1.max)}`;
+  if(twoTFEnabled){
+    const p2 = mode==="day"?"d2":(mode==="week"?"w2":(mode==="month"?"m2":"y2"));
+    const r2 = selectedRangeFrom(p2, mode);
+    t += ` vs ${fmtDate(r2.min)} to ${fmtDate(r2.max)}`;
+  }
+  chartTitleDisplay.textContent = t;
+  chartTitleDisplay.style.fontSize = (chartTitleSize.value || 16) + "px";
+}
+
+/* ---------- pivot slice ---------- */
+function buildSlice(mode, measures){
+  const rows =
+    mode==="week" ? [{ uniqueName:D.WEEKAD, sort:"asc" }] :
+    mode==="month"? [{ uniqueName:D.MONTHAD, sort:"asc" }] :
+    mode==="year" ? [{ uniqueName:D.YEAR,   sort:"asc" }] :
+                    [{ uniqueName:D.DAY,    sort:"asc" }];
+
+  const columns = twoTFEnabled
+    ? [{ uniqueName:D.TF }, { uniqueName:"Measures" }]
+    : [{ uniqueName:"Measures" }];
+
   return {
-    reportFilters: [{ uniqueName: COL_LINE }],
-    rows:         [{ uniqueName: COL_DAY, sort:"asc" }],
-    columns:      [{ uniqueName: "Measures" }],
-    measures: [
-      { uniqueName: BILL_KEY,   aggregation:"sum", caption:"Sum of " + BILL_KEY },
-      { uniqueName: ENERGY_KEY, aggregation:"sum", caption:"Sum of " + ENERGY_KEY }
-    ]
+    reportFilters: LINE_KEY ? [{ uniqueName: LINE_KEY }] : [],
+    rows: rows,
+    columns: columns,
+    measures: measures.map(m=>({ uniqueName:m, aggregation:"sum", caption:"Sum of "+m }))
   };
 }
 
-/* title helpers */
-function selectedRangeFromPickers(){
-  const from=new Date(+dStartY.value,+dStartM.value,+dStartD.value);
-  const to=new Date(+dEndY.value,+dEndM.value,+dEndD.value);
-  return {min:from,max:to};
-}
-function defaultTitle(){
-  const r = selectedRangeFromPickers();
-  return `Sum of Net Bill in NPR & Sum Of Traded Energy by Day from ${fmtDate(r.min)} to ${fmtDate(r.max)}`;
-}
-function updateTitle(){
-  const s = (document.getElementById("chartTitleInput").value || "").trim();
-  const t = s || defaultTitle();
-  const el = document.getElementById("chartTitleDisplay");
-  el.textContent = t;
-  el.style.fontSize = (document.getElementById("chartTitleSize").value || 16) + "px";
-}
-
-/* filtering by pickers */
-function filterByPickers(){
-  const r = selectedRangeFromPickers();
-  const inR=(d,a,b)=>d>=a && d<=b;
-  return enrichedRows.filter(row=>{
-    const d=toDateOnly(row[DATE_KEY]);
-    return d && inR(d,r.min,r.max);
+/* ---------- combo + chart ---------- */
+function buildComboPanel(names){
+  const holder=document.getElementById("comboPanel"); holder.innerHTML="";
+  names.forEach((nm,idx)=>{
+    if(!seriesSettings[nm]) seriesSettings[nm]={ type: idx===0?"column":"line", axis: idx===0?0:1 };
+    const row=document.createElement("div"); row.className="srow";
+    row.innerHTML = `
+      <div class="name">${nm}</div>
+      <select data-k="type">
+        <option value="column">Column</option>
+        <option value="line">Line</option>
+        <option value="spline">Spline</option>
+        <option value="area">Area</option>
+        <option value="bar">Bar</option>
+      </select>
+      <select data-k="axis">
+        <option value="0">Left Axis</option>
+        <option value="1">Right Axis</option>
+      </select>`;
+    holder.appendChild(row);
+    const [typeSel,axisSel]=row.querySelectorAll("select");
+    typeSel.value=seriesSettings[nm].type; axisSel.value=String(seriesSettings[nm].axis);
+    typeSel.onchange=e=>seriesSettings[nm].type=e.target.value;
+    axisSel.onchange=e=>seriesSettings[nm].axis=+e.target.value;
   });
 }
-function applyTimeframeAndRefresh(){
-  const filtered = filterByPickers();
-  const rpt = pivot.getReport();
-  rpt.dataSource = { data: filtered.length ? filtered : enrichedRows };
-  pivot.setReport(rpt);
+
+/* When comparing T1 vs T2, auto-map T2 series to right axis unless already customized */
+function autoMapAxesForTwin(seriesList, defaultType){
+  (seriesList||[]).forEach(s=>{
+    const name=(s.name||"").toLowerCase();
+    const isT2 = name.includes("t2") || name.includes("timeframe: t2");
+    const existing = seriesSettings[s.name];
+    if(!existing){
+      seriesSettings[s.name] = { type: defaultType, axis: isT2 ? 1 : 0 };
+    }else{
+      // If we are in Apply Both and user didn't explicitly choose an axis, nudge T2 to right
+      if(isT2 && (existing.axis===undefined || existing.axis===0)) existing.axis = 1;
+    }
+  });
 }
 
-/* chart */
 function renderChart(){
   if(!pivot) return;
   updateTitle();
-  const showLabels = document.getElementById("toggleLabels").checked;
-  const type = document.getElementById("chartType").value;
+  const defaultType = chartType.value;
+  const showLabels  = toggleLabels.checked;
 
-  pivot.highcharts.getData({ type }, function(cfg){
-    const leftTitle  = "Sum of " + BILL_KEY;
-    const rightTitle = "Sum of " + ENERGY_KEY;
-    cfg.yAxis=[{title:{text:leftTitle}},{title:{text:rightTitle},opposite:true}];
+  pivot.highcharts.getData({ type: defaultType }, function(cfg){
+    cfg.xAxis = cfg.xAxis || {};
+    cfg.xAxis.labels = Object.assign({}, cfg.xAxis.labels, { rotation: -90, style:{ fontSize:'12px' } });
+    cfg.xAxis.title = { text: null };
+
+    cfg.legend = { enabled:true, layout:"horizontal", align:"center", verticalAlign:"bottom",
+                   itemStyle:{ fontSize:"14px" }, symbolRadius:0, padding:8, margin:10 };
+
+    cfg.yAxis = [
+      { title:{ text:"" }, labels:{ style:{ fontSize:"12px" } } },
+      { title:{ text:"" }, labels:{ style:{ fontSize:"12px" } }, opposite:true }
+    ];
+
+    // Normalize names + auto-map axes for twin
+    const names=[];
     (cfg.series||[]).forEach(s=>{
-      const name=(s.name||"").toLowerCase();
-      if(name.includes(ENERGY_KEY.toLowerCase())) s.yAxis=1; else s.yAxis=0;
-      if(showLabels) s.dataLabels={enabled:true};
+      s.name=(s.name||"").replace(/^_+/,"").replace(/\s{2,}/g," ").trim()||"Series";
+      names.push(s.name);
     });
+    if(twoTFEnabled) autoMapAxesForTwin(cfg.series, defaultType);
+    buildComboPanel(names);
+
+    (cfg.series||[]).forEach(s=>{
+      const set=seriesSettings[s.name]||{type:defaultType,axis:0};
+      s.type=set.type; s.yAxis=set.axis;
+      const dp = set.axis===0 ? 4 : 2;
+      s.dataLabels = showLabels ? { enabled:true, formatter:function(){ return Highcharts.numberFormat(this.y, dp); } } : { enabled:false };
+      s.showInLegend = true;
+    });
+
+    cfg.tooltip = {
+      shared: true,
+      pointFormatter: function(){
+        const dp = this.series.yAxis && this.series.yAxis.opposite ? 2 : 4;
+        return '<span style="color:'+this.color+'">●</span> '+this.series.name+
+               ': <b>'+Highcharts.numberFormat(this.y, dp)+'</b><br/>';
+      }
+    };
+
     cfg.title={ text:"" };
     if(chartObj) chartObj.destroy();
     chartObj = Highcharts.chart("chart", cfg);
   }, function(err){ console.error(err); });
 }
-const rerenderChart = (fn=>{ let t; return ()=>{ clearTimeout(t); t=setTimeout(fn,120); }; })(renderChart);
+const rerenderChart = (fn=>{ let t; return ()=>{ clearTimeout(t); t=setTimeout(renderChart,120); }; })();
 
-/* pickers setup for last 7 days */
-function setupPickersTo(from,to){
-  const monthLen = (y,m)=>Array.from({length:monthDays(y,m)},(_,i)=>i+1);
-  dStartY.value=from.getFullYear(); dStartM.value=from.getMonth();
-  fillSelect(dStartD, monthLen(from.getFullYear(), from.getMonth())); dStartD.value=from.getDate();
-  dEndY.value=to.getFullYear(); dEndM.value=to.getMonth();
-  fillSelect(dEndD, monthLen(to.getFullYear(), to.getMonth())); dEndD.value=to.getDate();
+/* ---------- Recommended charts ---------- */
+function inferRecommendations(){
+  const rep = pivot.getReport();
+  const measures = (rep.slice?.measures || []).map(m=>m.uniqueName);
+  const m = measures.length;
+
+  const cards = [];
+  if (m === 1) {
+    cards.push(
+      { id:"col",   title:"Clustered Column", descr:"One value per category",      apply:()=>{ applyRecommended("column"); } },
+      { id:"line",  title:"Line",             descr:"Trend over categories/time",  apply:()=>{ applyRecommended("line"); } },
+      { id:"bar",   title:"Bar",              descr:"Many long category labels",   apply:()=>{ applyRecommended("bar"); } },
+      { id:"area",  title:"Area",             descr:"Filled line for trend",       apply:()=>{ applyRecommended("area"); } },
+      { id:"spline",title:"Spline",           descr:"Smoothed line",               apply:()=>{ applyRecommended("spline"); } },
+      { id:"stack", title:"Stacked Column",   descr:"(If split by series)",        apply:()=>{ applyRecommended("column-stacked"); } }
+    );
+  } else if (m === 2) {
+    cards.push(
+      { id:"combo", title:"Combo (Column + Line)", descr:"First measure column/left; second line/right", apply:()=>{ applyComboDefault(); } },
+      { id:"cols",  title:"Clustered Columns",     descr:"Compare two measures side-by-side",            apply:()=>{ applyRecommended("column"); resetSeries({ type:"column", axis:0 }); } },
+      { id:"lines", title:"Multiple Lines",        descr:"Both measures as lines",                        apply:()=>{ applyRecommended("line"); resetSeries({ type:"line", axis:0 }); } },
+      { id:"bars",  title:"Clustered Bars",        descr:"Horizontal comparison",                         apply:()=>{ applyRecommended("bar"); resetSeries({ type:"bar", axis:0 }); } }
+    );
+  } else {
+    cards.push(
+      { id:"stack", title:"Stacked Column",        descr:"Aggregate many measures",                       apply:()=>{ applyRecommended("column-stacked"); resetSeries({ type:"column", axis:0 }); } },
+      { id:"cols",  title:"Clustered Columns",      descr:"Compare measures per category",                apply:()=>{ applyRecommended("column"); resetSeries({ type:"column", axis:0 }); } },
+      { id:"lines", title:"Multiple Lines",         descr:"Many lines across time",                       apply:()=>{ applyRecommended("line"); resetSeries({ type:"line", axis:0 }); } },
+      { id:"bars",  title:"Clustered Bars",         descr:"Horizontal comparison",                        apply:()=>{ applyRecommended("bar"); resetSeries({ type:"bar", axis:0 }); } }
+    );
+  }
+  return cards;
 }
 
+function resetSeries({type, axis}){
+  pivot.highcharts.getData({ type: type || "column" }, function(cfg){
+    (cfg.series||[]).forEach(s=>{
+      const nm=(s.name||"").replace(/^_+/,"").trim();
+      seriesSettings[nm]={ type: type || "column", axis: (axis==null?0:axis) };
+    });
+    renderChart();
+  });
+}
+
+function applyComboDefault(){
+  pivot.highcharts.getData({ type:"column" }, function(cfg){
+    const names=(cfg.series||[]).map(s=>(s.name||"").replace(/^_+/,"").trim());
+    names.forEach((nm, i)=>{
+      seriesSettings[nm] = { type: i===0?"column":"line", axis: i===0?0:1 };
+    });
+    renderChart();
+  });
+}
+
+function applyRecommended(chartType){
+  if (chartType === "column-stacked") {
+    pivot.highcharts.getData({ type:"column" }, function(cfg){
+      (cfg.series||[]).forEach(s=>{
+        const nm=(s.name||"").replace(/^_+/,"").trim();
+        seriesSettings[nm] = { type:"column", axis:0 };
+      });
+      renderChart();
+      if (chartObj) chartObj.update({ plotOptions:{ series:{ stacking:"normal" } } });
+    });
+  } else {
+    resetSeries({ type: chartType, axis: 0 });
+  }
+}
+
+/* ---------- grid refresh ---------- */
+function switchModeUI(){
+  const m=tfMode.value;
+  document.querySelectorAll(".tf").forEach(el=>el.style.display="none");
+  document.querySelectorAll(".tf-"+m).forEach(el=>el.style.display="block");
+  document.querySelectorAll(".tf2").forEach(el=>el.style.display="none");
+  if(twoTFEnabled) document.querySelectorAll(".tf2.tf-"+m).forEach(el=>el.style.display="block");
+}
+
+function applyWithRanges({useT1, useT2}){
+  const mode=tfMode.value;
+
+  // R1
+  const p1 = mode==="day"?"d":(mode==="week"?"w":(mode==="month"?"m":"y"));
+  const r1 = selectedRangeFrom(p1, mode);
+  const f1 = enrichedRows.filter(rw=>{ const d=toDateOnly(rw[DATE_KEY]); return d && d>=r1.min && d<=r1.max; })
+                         .map(r=>Object.assign({}, r, {[D.TF]:"T1"}));
+
+  // R2
+  const p2 = mode==="day"?"d2":(mode==="week"?"w2":(mode==="month"?"m2":"y2"));
+  const r2 = selectedRangeFrom(p2, mode);
+  const f2 = enrichedRows.filter(rw=>{ const d=toDateOnly(rw[DATE_KEY]); return d && d>=r2.min && d<=r2.max; })
+                         .map(r=>Object.assign({}, r, {[D.TF]:"T2"}));
+
+  let dataForPivot = [];
+  if(useT1) dataForPivot = dataForPivot.concat(f1);
+  if(useT2) dataForPivot = dataForPivot.concat(f2);
+  if(!dataForPivot.length) dataForPivot = enrichedRows;
+
+  // Update slice + data
+  const rep = pivot.getReport();
+  rep.dataSource = { data: dataForPivot };
+  twoTFEnabled = (useT1 && useT2); // governs column split
+  rep.slice = buildSlice(mode, (rep.slice?.measures||[]).map(m=>m.uniqueName));
+  pivot.setReport(rep);
+
+  // Toggle panel visibility
+  document.getElementById("tf2Wrap").style.display = twoTFEnabled ? "block" : "none";
+  switchModeUI();
+
+  // Refresh chart mapping
+  rerenderChart();
+}
+
+/* ---------- bootstrap ---------- */
 (async function init(){
   try{
-    const r = await fetch(DATA_URL, { cache:"no-store" });
-    if(!r.ok) throw new Error("Failed to fetch JSON ("+r.status+")");
-    const payload = await r.json();
-    allRows = (payload && payload.record && Array.isArray(payload.record.rows)) ? payload.record.rows : [];
-    if(!allRows.length) throw new Error("No flat rows in JSONBin");
+    const resp = await fetch(DATA_URL, { cache:"no-store" });
+    if(!resp.ok) throw new Error("Failed to fetch JSON ("+resp.status+")");
+    const payload = await resp.json();
+    const raw = Array.isArray(payload?.rows) ? payload.rows : [];
+    if(!raw.length) throw new Error("No rows found at the public JSON URL.");
 
-    DATE_KEY   = ciFindKey(allRows[0], COL_DATE);
-    ENERGY_KEY = ciFindKey(allRows[0], COL_ENERGY);
-    BILL_KEY   = ciFindKey(allRows[0], COL_BILL);
+    // detect keys
+    DATE_KEY = findAny(raw[0], GUESS_DATE) || "Traded Date";
+    LINE_KEY = findAny(raw[0], GUESS_LINE) || "Line";
 
-    // Enrich with independent Day/Month/Year fields
-    enrichedRows = enrichWithDateParts(allRows, DATE_KEY);
+    // enrich
+    enrichedRows = enrich(raw, DATE_KEY);
+    allRows = enrichedRows.slice();
 
-    // default datasource: last 7 days
-    const last = maxDate(enrichedRows, DATE_KEY);
-    const from = last ? addDays(last, -6) : null;
-    const viewRows = (from && last)
-      ? enrichedRows.filter(r=>{ const d=toDateOnly(r[DATE_KEY]); return d && d>=from && d<=last; })
-      : enrichedRows.slice();
+    // default range: last 7 days available
+    const dates = allRows.map(r=>toDateOnly(r[DATE_KEY])).filter(Boolean);
+    const max = dates.length? new Date(Math.max.apply(null, dates)) : new Date();
+    const min = dates.length? addDays(max, -6) : max;
+
+    // build pickers
+    const allYears=[...new Set(allRows.map(r=>toDateOnly(r[DATE_KEY])?.getFullYear()).filter(Boolean))].sort((a,b)=>a-b);
+    const months=Array.from({length:12},(_,i)=>i);
+    const phases=["First","Second","Third","Last"];
+
+    // ------ T1 ------
+    const fillSelect=(sel,arr,map=(x)=>x)=>{ sel.innerHTML=""; arr.forEach(v=>{ const o=document.createElement("option"); o.value=v; o.textContent=map(v); sel.appendChild(o); }); };
+    ["dStartY","dEndY"].forEach(id=>fillSelect(document.getElementById(id), allYears));
+    ["dStartM","dEndM"].forEach(id=>fillSelect(document.getElementById(id), months, monthLabel));
+    const setDays=(selY,selM,selD)=>fillSelect(selD, Array.from({length:monthDays(+selY.value,+selM.value)},(_,i)=>i+1));
+    const _dSY=document.getElementById("dStartY"), _dSM=document.getElementById("dStartM"), _dSD=document.getElementById("dStartD");
+    const _dEY=document.getElementById("dEndY"),   _dEM=document.getElementById("dEndM"),   _dED=document.getElementById("dEndD");
+    _dSY.value=min.getFullYear(); _dSM.value=min.getMonth(); setDays(_dSY,_dSM,_dSD); _dSD.value=min.getDate();
+    _dEY.value=max.getFullYear(); _dEM.value=max.getMonth(); setDays(_dEY,_dEM,_dED); _dED.value=max.getDate();
+    _dSY.onchange=_dSM.onchange=()=>setDays(_dSY,_dSM,_dSD);
+    _dEY.onchange=_dEM.onchange=()=>setDays(_dEY,_dEM,_dED);
+
+    ["wStartY","wEndY"].forEach(id=>fillSelect(document.getElementById(id), allYears));
+    ["wStartM","wEndM"].forEach(id=>fillSelect(document.getElementById(id), months, monthLabel));
+    ["wStartP","wEndP"].forEach(id=>fillSelect(document.getElementById(id), phases));
+    wStartY.value=min.getFullYear(); wStartM.value=min.getMonth(); wStartP.value=weekPhase(min);
+    wEndY.value=max.getFullYear();   wEndM.value=max.getMonth();   wEndP.value=weekPhase(max);
+
+    ["mStartY","mEndY"].forEach(id=>fillSelect(document.getElementById(id), allYears));
+    ["mStartM","mEndM"].forEach(id=>fillSelect(document.getElementById(id), months, monthLabel));
+    mStartY.value=min.getFullYear(); mStartM.value=min.getMonth();
+    mEndY.value=max.getFullYear();   mEndM.value=max.getMonth();
+
+    ["yStartY","yEndY"].forEach(id=>fillSelect(document.getElementById(id), allYears));
+    yStartY.value = allYears[0] ?? min.getFullYear();
+    yEndY.value   = allYears[allYears.length-1] ?? max.getFullYear();
+
+    // ------ T2 ------
+    ["d2StartY","d2EndY"].forEach(id=>fillSelect(document.getElementById(id), allYears));
+    ["d2StartM","d2EndM"].forEach(id=>fillSelect(document.getElementById(id), months, monthLabel));
+    const setDays2=(selY,selM,selD)=>fillSelect(selD, Array.from({length:monthDays(+selY.value,+selM.value)},(_,i)=>i+1));
+    const _d2SY=document.getElementById("d2StartY"), _d2SM=document.getElementById("d2StartM"), _d2SD=document.getElementById("d2StartD");
+    const _d2EY=document.getElementById("d2EndY"),   _d2EM=document.getElementById("d2EndM"),   _d2ED=document.getElementById("d2EndD");
+    _d2SY.value=min.getFullYear(); _d2SM.value=min.getMonth(); setDays2(_d2SY,_d2SM,_d2SD); _d2SD.value=min.getDate();
+    _d2EY.value=max.getFullYear(); _d2EM.value=max.getMonth(); setDays2(_d2EY,_d2EM,_d2ED); _d2ED.value=max.getDate();
+    _d2SY.onchange=_d2SM.onchange=()=>setDays2(_d2SY,_d2SM,_d2SD);
+    _d2EY.onchange=_d2EM.onchange=()=>setDays2(_d2EY,_d2EM,_d2ED);
+
+    ["w2StartY","w2EndY"].forEach(id=>fillSelect(document.getElementById(id), allYears));
+    ["w2StartM","w2EndM"].forEach(id=>fillSelect(document.getElementById(id), months, monthLabel));
+    ["w2StartP","w2EndP"].forEach(id=>fillSelect(document.getElementById(id), phases));
+    w2StartY.value=min.getFullYear(); w2StartM.value=min.getMonth(); w2StartP.value=weekPhase(min);
+    w2EndY.value=max.getFullYear();   w2EndM.value=max.getMonth();   w2EndP.value=weekPhase(max);
+
+    ["m2StartY","m2EndY"].forEach(id=>fillSelect(document.getElementById(id), allYears));
+    ["m2StartM","m2EndM"].forEach(id=>fillSelect(document.getElementById(id), months, monthLabel));
+    m2StartY.value=min.getFullYear(); m2StartM.value=min.getMonth();
+    m2EndY.value=max.getFullYear();   m2EndM.value=max.getMonth();
+
+    ["y2StartY","y2EndY"].forEach(id=>fillSelect(document.getElementById(id), allYears));
+    y2StartY.value = allYears[0] ?? min.getFullYear();
+    y2EndY.value   = allYears[allYears.length-1] ?? max.getFullYear();
+
+    // init pivot
+    const measures = detectNumericMeasures(raw[0]);
+    if(!measures.length) throw new Error("No numeric columns detected to chart.");
+
+    const fmts = [
+      { name:"fmt2", decimalPlaces:2, thousandsSeparator:",", decimalSeparator:".", textAlign:"right" },
+      { name:"fmt4", decimalPlaces:4, thousandsSeparator:",", decimalSeparator:".", textAlign:"right" }
+    ];
 
     pivot = new WebDataRocks({
       container:"#wdr",
       height:520,
       toolbar:true,
       report:{
-        dataSource:{ data:viewRows },
-        slice: buildDefaultSlice(),
-        options:{ grid:{ type:"classic", showTotals:"rows", showGrandTotals:"rows", showHeaders:true } }
+        dataSource:{ data: allRows.filter(r=>{ const d=toDateOnly(r[DATE_KEY]); return d && d>=min && d<=max; }) },
+        slice: buildSlice("day", measures),
+        formats: fmts,
+        options:{ grid:{ type:"classic", showTotals:"on", showGrandTotals:"on", showHeaders:true } }
+      },
+      customizeCell: function(cellBuilder, cellData){
+        if(!cellData) return;
+        const t=cellData.type;
+        if(t==="value"||t==="total"||t==="grandtotal"){
+          const m=cellData.measure && (cellData.measure.uniqueName || cellData.measure.caption || "");
+          const v=cellData.value;
+          if(typeof v==="number" && isFinite(v)){
+            const lower=(m||"").toLowerCase();
+            const dp = (lower.includes("energy")||lower.includes("mwh")||lower.includes("kwh")) ? 4 : 2;
+            cellBuilder.text = new Intl.NumberFormat(undefined,{minimumFractionDigits:dp, maximumFractionDigits:dp}).format(v);
+            if(t!=="value") cellBuilder.attr["style"]=(cellBuilder.attr["style"]||"")+";font-weight:700;";
+          }
+        }
       },
       reportcomplete: function(){
         pivot.off("reportcomplete");
@@ -368,25 +757,58 @@ function setupPickersTo(from,to){
       reportchange: function(){ rerenderChart(); }
     });
 
-    // init pickers lists (years + months) and set to last-7 range
-    const years=[...new Set(enrichedRows.map(r=>toDateOnly(r[DATE_KEY])?.getFullYear()).filter(Boolean))].sort((a,b)=>a-b);
-    ["dStartY","dEndY"].forEach(id=>fillSelect(document.getElementById(id), years));
-    const monthsAll = Array.from({length:12},(_,i)=>i);
-    ["dStartM","dEndM"].forEach(id=>fillSelect(document.getElementById(id), monthsAll, i => new Date(2000,i,1).toLocaleString(undefined,{month:"long"})));
-    if (from && last) setupPickersTo(from,last);
+    /* Buttons */
+    tfMode.onchange = ()=>{ switchModeUI(); applyWithRanges({useT1:true, useT2:twoTFEnabled}); };
+    btnApply.onclick = ()=> applyWithRanges({useT1:true, useT2:twoTFEnabled});
+    btnExcel.onclick = ()=> pivot.exportTo("excel", { filename:"pivot_table" });
+    btnPDF.onclick   = ()=> { if(chartObj) chartObj.exportChart({ type:"application/pdf", filename:"pivot_chart" }); };
+    btnApplyChart.onclick = ()=> rerenderChart();
+    btnApplyCombo.onclick = ()=> rerenderChart();
+    chartTitleSize.onchange = ()=> updateTitle();
 
-    // wire controls
-    btnApply.onclick = () => { applyTimeframeAndRefresh(); };
-    btnExcel.onclick = () => pivot.exportTo("excel", { filename:"pivot_table" });
-    btnPDF.onclick   = () => { if(chartObj) chartObj.exportChart({ type:"application/pdf", filename:"pivot_chart" }); };
-    btnApplyChart.onclick = () => rerenderChart();
-    chartTitleSize.onchange = () => updateTitle();
+    // Toggle Combo
+    btnToggleCombo.onclick = ()=>{
+      const el=document.getElementById("comboPanelWrap");
+      el.style.display = (el.style.display==="none"||!el.style.display) ? "block" : "none";
+    };
+
+    // Two Timeframes toggle (just shows/hides the panel; Apply buttons decide data behavior)
+    btnTwin.onclick = ()=>{
+      twoTFEnabled = !twoTFEnabled;
+      document.getElementById("tf2Wrap").style.display = twoTFEnabled ? "block" : "none";
+      btnTwin.textContent = twoTFEnabled ? "Two Timeframes: ON" : "Two Timeframes";
+      switchModeUI();
+    };
+
+    // New: explicit actions
+    btnT1Only.onclick = ()=> { applyWithRanges({useT1:true, useT2:false}); };
+    btnT2Only.onclick = ()=> { applyWithRanges({useT1:false, useT2:true}); };
+    btnBoth.onclick   = ()=> { applyWithRanges({useT1:true, useT2:true}); };
+
+    // Recommended charts
+    btnRecommend.onclick = ()=>{
+      const recs = inferRecommendations();
+      const grid = document.getElementById("recGrid"); grid.innerHTML="";
+      recs.forEach(r=>{
+        const card=document.createElement("div");
+        card.className="recCard";
+        card.innerHTML=`<div class="recTitle">${r.title}</div><div class="recDescr">${r.descr}</div>`;
+        card.onclick = ()=>{ r.apply(); closeRec(); };
+        grid.appendChild(card);
+      });
+      openRec();
+    };
+    recClose.onclick = ()=> closeRec();
 
   }catch(e){
     alert(e.message || e);
     console.error(e);
   }
 })();
+
+/* Modal helpers */
+function openRec(){ document.getElementById("recModal").style.display="flex"; }
+function closeRec(){ document.getElementById("recModal").style.display="none"; }
 </script>
 </body>
 </html>
