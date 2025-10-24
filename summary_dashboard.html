@@ -23,9 +23,15 @@
   .toolbar { position:absolute; top:8px; right:8px; display:flex; gap:8px; z-index:5; }
   .toolbtn { background:#0f172a; color:#fff; border:0; border-radius:8px; padding:6px 10px; cursor:pointer; font-size:12px; opacity:.9 }
   .toolbtn:hover { opacity:1 }
-  .note { font-size: 12px; color:#666; white-space:pre-wrap; }
+  .note { font-size: 12px; color: #666; white-space:pre-wrap; }
   .row { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
   .inline { display:flex; align-items:center; gap:8px; }
+
+  /* Data Levels panel (visibility + value labels) */
+  .panel { position:absolute; top:40px; right:8px; z-index:6; background:#ffffff; border:1px solid #e5e7eb; border-radius:10px; padding:10px; width:260px; box-shadow: 0 8px 24px rgba(0,0,0,.08); display:none; }
+  .panel h4 { margin:0 0 8px 0; font-size:13px; }
+  .trace-list { max-height:160px; overflow:auto; border:1px solid #f1f5f9; border-radius:8px; padding:6px; margin:6px 0 10px; }
+  .panel .inline { justify-content: space-between; }
 </style>
 </head>
 <body>
@@ -101,7 +107,16 @@
   <h2 style="margin:0 0 12px 0;">Chart 1 — Block-wise</h2>
   <div id="chart" class="chart">
     <div class="toolbar">
+      <button class="toolbtn" onclick="togglePanel('chart')">⚙️ Data levels</button>
       <button class="toolbtn" onclick="fs('chart')">⤢ Fullscreen</button>
+    </div>
+    <div id="panel-chart" class="panel">
+      <h4>Series visibility</h4>
+      <div id="traces-chart" class="trace-list"></div>
+      <div class="inline">
+        <label for="vals-chart">Show values</label>
+        <input id="vals-chart" type="checkbox">
+      </div>
     </div>
   </div>
   <div id="forecastNotes" class="note" style="margin-top:10px;"></div>
@@ -118,7 +133,17 @@
   <h2 style="margin:0 0 12px 0;">Chart 2 — Day-series (block-averaged)</h2>
   <div id="chart2" class="chart">
     <div class="toolbar">
+      <button class="toolbtn" onclick="togglePanel('chart2')">⚙️ Data levels</button>
       <button class="toolbtn" onclick="fs('chart2')">⤢ Fullscreen</button>
+    </div>
+    <div id="panel-chart2" class="panel">
+      <h4>Series visibility</h4>
+      <div id="traces-chart2" class="trace-list"></div>
+      <div class="inline">
+        <label for="vals-chart2">Show values</label>
+        <input id="vals-chart2" type="checkbox">
+      </div>
+      <div id="vals-note-chart2" class="note" style="margin-top:6px;">(Only effective when points &lt; 100)</div>
     </div>
   </div>
 </div>
@@ -128,28 +153,38 @@
   <h2 style="margin:0 0 12px 0;">Chart 3 — Weekday averages (Sun→Sat)</h2>
   <div id="chart3" class="chart">
     <div class="toolbar">
+      <button class="toolbtn" onclick="togglePanel('chart3')">⚙️ Data levels</button>
       <button class="toolbtn" onclick="fs('chart3')">⤢ Fullscreen</button>
+    </div>
+    <div id="panel-chart3" class="panel">
+      <h4>Series visibility</h4>
+      <div id="traces-chart3" class="trace-list"></div>
+      <div class="inline">
+        <label for="vals-chart3">Show values</label>
+        <input id="vals-chart3" type="checkbox">
+      </div>
     </div>
   </div>
 </div>
 
 <script>
-/* ======= Fullscreen helper ======= */
+/* ======= Fullscreen & Panel helpers ======= */
 function fs(id){
   const el = document.getElementById(id);
   if (!document.fullscreenElement) { el.requestFullscreen?.(); }
   else { document.exitFullscreen?.(); }
 }
+function togglePanel(chartId){
+  const el = document.getElementById('panel-'+chartId);
+  el.style.display = (el.style.display==='none' || !el.style.display) ? 'block' : 'none';
+}
 
 /* ========= CSV loader (Supabase Storage) ========= */
-
 const SUPABASE_BASE = "https://imloololrtufqywapowk.supabase.co/storage/v1/object/public/flat-data/summary";
 const urlParams = new URLSearchParams(location.search);
 const archiveDate = urlParams.get("date"); // YYYY-MM-DD
-const CSV_URL = archiveDate
-  ? `${SUPABASE_BASE}/archive/${archiveDate}.csv`
-  : `${SUPABASE_BASE}/latest/summary.csv`;
-
+const CSV_URL = archiveDate ? `${SUPABASE_BASE}/archive/${archiveDate}.csv`
+                            : `${SUPABASE_BASE}/latest/summary.csv`;
 document.getElementById("csvUrl").textContent = CSV_URL;
 
 /* tiny CSV parser */
@@ -164,10 +199,7 @@ function parseCSV(text) {
   });
   return { headers, rows };
 }
-
-function looksLikeBlock(h) {
-  return /^\d{2}:\d{2}\s*-\s*\d{2}:\d{2}$/.test(h);
-}
+function looksLikeBlock(h) { return /^\d{2}:\d{2}\s*-\s*\d{2}:\d{2}$/.test(h); }
 
 async function loadPayload() {
   const resp = await fetch(CSV_URL, { cache: "no-store" });
@@ -191,7 +223,6 @@ async function loadPayload() {
 
   const adDates = transformed.map(r => r._DATE).filter(Boolean).sort();
   const dmin = adDates[0] || ""; const dmax = adDates[adDates.length-1] || "";
-
   const nepDates = Array.from(new Set(transformed.map(r => r._NEP).filter(Boolean))).sort();
 
   return {
@@ -240,13 +271,8 @@ async function loadPayload() {
   const b1Sel   = document.getElementById('blockStart');
   const bnSel   = document.getElementById('blockEnd');
 
-  if (hasNepali && NEP_COL) {
-    modeBS.disabled = false;
-    document.getElementById('nepAvail').textContent = "";
-  } else {
-    modeBS.disabled = true;
-    document.getElementById('nepAvail').textContent = "(Nepali_Date not found in CSV)";
-  }
+  if (hasNepali && NEP_COL) { modeBS.disabled = false; document.getElementById('nepAvail').textContent = ""; }
+  else { modeBS.disabled = true; document.getElementById('nepAvail').textContent = "(Nepali_Date not found in CSV)"; }
 
   fAD.value = payload.default_first_ad || "";
   sAD.value = payload.default_second_ad || "";
@@ -254,47 +280,29 @@ async function loadPayload() {
   function populateBS(selectEl, values) {
     selectEl.innerHTML = "";
     values.forEach(v => {
-      const o = document.createElement('option');
-      o.value = v; o.textContent = v;
-      selectEl.appendChild(o);
+      const o = document.createElement('option'); o.value = v; o.textContent = v; selectEl.appendChild(o);
     });
   }
   populateBS(fBS, nepDates);
   populateBS(sBS, nepDates);
-  if (nepDates.length) {
-    fBS.value = payload.default_nep_first || nepDates[0];
-    sBS.value = payload.default_nep_second || nepDates[nepDates.length-1];
-  }
+  if (nepDates.length) { fBS.value = payload.default_nep_first || nepDates[0]; sBS.value = payload.default_nep_second || nepDates[nepDates.length-1]; }
 
-  function refreshMode() {
-    adWrap.style.display = modeAD.checked ? "" : "none";
-    bsWrap.style.display = modeAD.checked ? "none" : "";
-  }
+  function refreshMode(){ adWrap.style.display = modeAD.checked ? "" : "none"; bsWrap.style.display = modeAD.checked ? "none" : ""; }
   modeAD.addEventListener('change', refreshMode);
   modeBS.addEventListener('change', refreshMode);
   refreshMode();
 
-  (payload.day_options || ["All"]).forEach(v => {
-    const o = document.createElement('option'); o.value=v; o.textContent=v; daySel.appendChild(o);
-  });
-  (payload.type_options || ["All","DAM","RTM"]).forEach(v => {
-    const o = document.createElement('option'); o.value=v; o.textContent=v; typeSel.appendChild(o);
-  });
-  blocks.forEach(v => {
-    const o1=document.createElement('option'); o1.value=v; o1.textContent=v; b1Sel.appendChild(o1);
-    const o2=document.createElement('option'); o2.value=v; o2.textContent=v; bnSel.appendChild(o2);
-  });
-  daySel.value = "All"; typeSel.value = "All";
+  (payload.day_options || ["All"]).forEach(v => { const o = document.createElement('option'); o.value=v; o.textContent=v; daySel.appendChild(o); });
+  (payload.type_options || ["All","DAM","RTM"]).forEach(v => { const o = document.createElement('option'); o.value=v; o.textContent=v; typeSel.appendChild(o); });
+  blocks.forEach(v => { const o1=document.createElement('option'); o1.value=v; o1.textContent=v; b1Sel.appendChild(o1);
+                        const o2=document.createElement('option'); o2.value=v; o2.textContent=v; bnSel.appendChild(o2); });
+  daySel.value="All"; typeSel.value="All";
   b1Sel.value = payload.default_block1 || blocks[0];
   bnSel.value = payload.default_blockn || blocks[blocks.length-1];
 
-  function num(v) {
-    if (v === null || v === undefined || v==="") return null;
-    const n = Number(String(v).replace(/[, ]/g, ''));
-    return Number.isFinite(n) ? n : null;
-  }
+  function num(v){ if (v===null || v===undefined || v==="") return null; const n = Number(String(v).replace(/[, ]/g,'')); return Number.isFinite(n)? n : null; }
 
-  // helpers to slice by conditions
+  // filters
   function filterRowsBase() {
     const useBS = modeBS.checked && hasNepali && NEP_COL;
     const dateField = useBS ? NEP_COL : DATE;
@@ -314,80 +322,30 @@ async function loadPayload() {
     });
     return { filtered, dateField, lo, hi, useBS };
   }
-
-  function selectedBlockSpan() {
+  function selectedBlockSpan(){
     const start = b1Sel.value, end = bnSel.value;
     const i1 = blocks.indexOf(start), i2 = blocks.indexOf(end);
-    if (i1 < 0 || i2 < 0) return [];
+    if (i1<0 || i2<0) return [];
     const a = Math.min(i1,i2), b = Math.max(i1,i2);
-    return blocks.slice(a, b+1);
+    return blocks.slice(a,b+1);
   }
 
-  // Utility: sort by DATE
-  function orderByDate(arr) {
-    return arr.slice().sort((a,b) => String(a[DATE]).localeCompare(String(b[DATE])));
-  }
-  function rowsByType(type) {
-    return rows.filter(r => String(r[TYPE]||"").toUpperCase() === type);
-  }
-  function maxDateAD() {
-    const ds = rows.map(r=>r[DATE]).filter(Boolean).sort();
-    return ds[ds.length-1] || "";
-  }
-  function dayNameOf(adISOString) {
-    const d = new Date(adISOString+"T00:00:00");
-    return d.toLocaleDateString("en-US",{weekday:"long"});
-  }
-  function meanBlock(rowsArr, blk) {
-    let s=0,nc=0;
-    rowsArr.forEach(r => {
-      const v = num(r[blk]); if (v!==null){ s+=v; nc++; }
-    });
-    return nc? s/nc : null;
-  }
-  function avgOverBlocksOfRow(r, span) {
-    let s=0, n=0;
-    span.forEach(c => { const v=num(r[c]); if (v!==null){ s+=v; n++; } });
-    return n? s/n : null;
-  }
-  function meanArray(arr) {
-    const zs = arr.filter(v => v!=null && Number.isFinite(v));
-    if (!zs.length) return null;
-    return zs.reduce((a,b)=>a+b,0)/zs.length;
-  }
+  // helpers
+  function orderByDate(arr){ return arr.slice().sort((a,b)=> String(a[DATE]).localeCompare(String(b[DATE]))); }
+  function rowsByType(type){ return rows.filter(r => String(r[TYPE]||"").toUpperCase() === type); }
+  function maxDateAD(){ const ds=rows.map(r=>r[DATE]).filter(Boolean).sort(); return ds[ds.length-1] || ""; }
+  function dayNameOf(iso){ const d = new Date(iso+"T00:00:00"); return d.toLocaleDateString("en-US",{weekday:"long"}); }
+  function meanBlock(rowsArr, blk){ let s=0,n=0; rowsArr.forEach(r=>{ const v=num(r[blk]); if(v!==null){ s+=v;n++; }}); return n? s/n : null; }
+  function avgOverBlocksOfRow(r, span){ let s=0,n=0; span.forEach(c=>{ const v=num(r[c]); if(v!==null){ s+=v;n++; }}); return n? s/n : null; }
+  function meanArray(arr){ const zs=arr.filter(v=>v!=null && Number.isFinite(v)); if(!zs.length) return null; return zs.reduce((a,b)=>a+b,0)/zs.length; }
 
-  // Windows
-  function lastNDays(type, beforeDate, n) {
-    const arr = orderByDate(rowsByType(type)).filter(r => r[DATE] < beforeDate);
-    return arr.slice(-n);
-  }
-  function prevNDaysWindow(type, beforeDate, n, offsetN) {
-    const arr = orderByDate(rowsByType(type)).filter(r => r[DATE] < beforeDate);
-    const end = arr.length - offsetN; const start = Math.max(0, end - n);
-    return arr.slice(start, end);
-  }
-  function pickSameWeekdaySeries(type, weekday, beforeDate, k) {
-    const arr = orderByDate(rowsByType(type)).filter(r => r[DATE] < beforeDate && String(r[DAY]).toLowerCase() === String(weekday).toLowerCase());
-    return arr.slice(-k).reverse(); // most recent first
-  }
-  function windowAvg(rowsArr, blk) {
-    if (!rowsArr || !rowsArr.length) return null;
-    return meanBlock(rowsArr, blk);
-    // rowsArr are whole-day rows; meanBlock computes avg of a given block over all rows in window
-  }
+  function lastNDays(type, beforeDate, n){ const arr=orderByDate(rowsByType(type)).filter(r=>r[DATE] < beforeDate); return arr.slice(-n); }
+  function prevNDaysWindow(type,beforeDate,n,offsetN){ const arr=orderByDate(rowsByType(type)).filter(r=>r[DATE] < beforeDate); const end=arr.length - offsetN; const start=Math.max(0,end-n); return arr.slice(start,end); }
+  function pickSameWeekdaySeries(type,weekday,beforeDate,k){ const arr=orderByDate(rowsByType(type)).filter(r=>r[DATE] < beforeDate && String(r[DAY]).toLowerCase()===String(weekday).toLowerCase()); return arr.slice(-k).reverse(); }
+  function windowAvg(rowsArr, blk){ if(!rowsArr || !rowsArr.length) return null; return meanBlock(rowsArr, blk); }
+  function findSameDayLastYear(type, targetAD){ const d=new Date(targetAD+"T00:00:00Z"); d.setUTCFullYear(d.getUTCFullYear()-1); const yiso=d.toISOString().slice(0,10); const arr=orderByDate(rowsByType(type)).filter(r=>r[DATE]===yiso); return arr.length? arr[0] : null; }
 
-  function dateAddDays(iso, n){
-    const d = new Date(iso+"T00:00:00Z"); d.setUTCDate(d.getUTCDate()+n);
-    return d.toISOString().slice(0,10);
-  }
-  function findSameDayLastYear(type, targetAD){
-    const d = new Date(targetAD+"T00:00:00Z"); d.setUTCFullYear(d.getUTCFullYear()-1);
-    const yiso = d.toISOString().slice(0,10);
-    const arr = orderByDate(rowsByType(type)).filter(r => r[DATE] === yiso);
-    return arr.length ? arr[0] : null;
-  }
-
-  // ---- NEW Forecast builder (per your formulas) ----
+  // Forecast logic (as set previously)
   function forecastSeriesForDate(targetAD, span) {
     const latest = maxDateAD();
     const daysAhead = Math.max(0, Math.round((new Date(targetAD) - new Date(latest)) / 86400000));
@@ -401,9 +359,9 @@ async function loadPayload() {
 
       const last7   = lastNDays(tp, targetAD, 7);
       const prev7   = prevNDaysWindow(tp, targetAD, 7, 7);
-      const last28  = lastNDays(tp, targetAD, 28);        // approx 4 weeks
+      const last28  = lastNDays(tp, targetAD, 28);
       const prev28  = prevNDaysWindow(tp, targetAD, 28, 28);
-      const last120 = lastNDays(tp, targetAD, 120);       // approx 4 months
+      const last120 = lastNDays(tp, targetAD, 120);
       const prev120 = prevNDaysWindow(tp, targetAD, 120, 120);
       const sameLY  = findSameDayLastYear(tp, targetAD);
 
@@ -413,36 +371,23 @@ async function loadPayload() {
         const wn3 = w3 ? num(w3[blk]) ?? 0 : 0;
         const wn4 = w4 ? num(w4[blk]) ?? 0 : 0;
 
-        const last7Avg  = windowAvg(last7, blk)  ?? 0;
-        const prev7Avg  = windowAvg(prev7, blk)  ?? 0;
+        const last7Avg  = windowAvg(last7,  blk) ?? 0;
+        const prev7Avg  = windowAvg(prev7,  blk) ?? 0;
         const last28Avg = windowAvg(last28, blk) ?? 0;
         const prev28Avg = windowAvg(prev28, blk) ?? 0;
-        const last120Avg= windowAvg(last120, blk)?? 0;
-        const prev120Avg= windowAvg(prev120, blk)?? 0;
+        const last120Avg= windowAvg(last120,blk) ?? 0;
+        const prev120Avg= windowAvg(prev120,blk) ?? 0;
         const lyVal     = sameLY ? (num(sameLY[blk]) ?? 0) : 0;
 
-        // base weights (always apply)
         let base = 0.3*wn1 + 0.2*wn2 + 0.1*wn3 + 0.05*wn4;
-
         let val = base;
+
         if (daysAhead <= 7) {
-          // day(n+1) and ahead (≤ 7 days):
-          // 0.3*wn-1+0.2*wn-2+0.1*wn-3+0.05*wn-4
-          // + 0.4*( last matching weekday price + avg(last7) - avg(prev7) )
-          const component = last7Avg - prev7Avg;
-          val += 0.4 * component;
+          val += 0.4 * (wn1 + (last7Avg - prev7Avg));
         } else if (daysAhead <= 30) {
-          // > 7 days & ≤ 30 days:
-          // base + 0.2*(wn1 + (last28 - prev28)) + 0.2*(wn1 + (last7 - prev7))
-          const comp1 = wn1 + (last28Avg - prev28Avg);
-          const comp2 = wn1 + (last7Avg  - prev7Avg);
-          val += 0.2*comp1 + 0.2*comp2;
+          val += 0.2*(wn1 + (last28Avg - prev28Avg)) + 0.2*(wn1 + (last7Avg - prev7Avg));
         } else {
-          // > 30 days:
-          // base + 0.4*( (last120 - prev120) + ((wn1 + lyVal)/2) )
-          const mom4m = (last120Avg - prev120Avg);
-          const seasonal = (wn1 + lyVal)/2;
-          val += 0.4 * (mom4m + seasonal);
+          val += 0.4 * ( (last120Avg - prev120Avg) + ((wn1 + lyVal)/2) );
         }
         return val;
       });
@@ -468,114 +413,44 @@ async function loadPayload() {
     });
     return { min: (mn===null? "": mn), max: (mx===null? "": mx), avg: (n? s/n: "") };
   }
-
   function addAggregateRows(rowsWithStats, span) {
     const aggMin = {}, aggMax = {}, aggAvg = {};
     span.forEach(c => {
       let mn=null, mx=null, s=0, n=0;
       rowsWithStats.forEach(r => {
-        const v = num(r[c]);
-        if (v === null) return;
-        if (mn===null || v<mn) mn=v;
-        if (mx===null || v>mx) mx=v;
-        s+=v; n+=1;
+        const v = num(r[c]); if (v === null) return;
+        if (mn===null || v<mn) mn=v; if (mx===null || v>mx) mx=v; s+=v; n+=1;
       });
-      aggMin[c] = (mn===null? "": mn);
-      aggMax[c] = (mx===null? "": mx);
-      aggAvg[c] = (n? s/n: "");
+      aggMin[c]=(mn===null?"":mn); aggMax[c]=(mx===null?"":mx); aggAvg[c]=(n? s/n: "");
     });
     let minOfMin=null, maxOfMax=null, sAvg=0, nAvg=0;
     rowsWithStats.forEach(r => {
-      const rmin = num(r.__MIN), rmax = num(r.__MAX), ravg = num(r.__AVG);
-      if (rmin!==null) minOfMin = (minOfMin===null ? rmin : Math.min(minOfMin, rmin));
-      if (rmax!==null) maxOfMax = (maxOfMax===null ? rmax : Math.max(maxOfMax, rmax));
-      if (ravg!==null) { sAvg += ravg; nAvg += 1; }
+      const rmin=num(r.__MIN), rmax=num(r.__MAX), ravg=num(r.__AVG);
+      if (rmin!==null) minOfMin=(minOfMin===null? rmin : Math.min(minOfMin,rmin));
+      if (rmax!==null) maxOfMax=(maxOfMax===null? rmax : Math.max(maxOfMax,rmax));
+      if (ravg!==null){ sAvg+=ravg; nAvg+=1; }
     });
-    const aggMinRow = Object.assign({}, aggMin, { _LABEL: "Aggregate-Min", __MIN: (minOfMin===null? "": minOfMin), __MAX: "", __AVG: "" });
-    const aggMaxRow = Object.assign({}, aggMax, { _LABEL: "Aggregate-Max", __MIN: "", __MAX: (maxOfMax===null? "": maxOfMax), __AVG: "" });
-    const aggAvgRow = Object.assign({}, aggAvg, { _LABEL: "Aggregate-Avg", __MIN: "", __MAX: "", __AVG: (nAvg? sAvg/nAvg: "") });
+    const aggMinRow = Object.assign({}, aggMin, { _LABEL:"Aggregate-Min", __MIN:(minOfMin===null?"":minOfMin), __MAX:"", __AVG:"" });
+    const aggMaxRow = Object.assign({}, aggMax, { _LABEL:"Aggregate-Max", __MIN:"", __MAX:(maxOfMax===null?"":maxOfMax), __AVG:"" });
+    const aggAvgRow = Object.assign({}, aggAvg, { _LABEL:"Aggregate-Avg", __MIN:"", __MAX:"", __AVG:(nAvg? sAvg/nAvg: "") });
     return [aggMinRow, aggMaxRow, aggAvgRow];
   }
-
   function buildSyntheticForecastRows(targetAD, span) {
     const { dam, rtm, iex } = forecastSeriesForDate(targetAD, span);
     function mkRow(type, y) {
-      const o = {};
-      o["_DATE"] = targetAD + " (Forecast)";
-      o["_NEP"] = ""; o["_DAY"] = dayNameOf(targetAD); o["_TYPE"] = type;
-      span.forEach((b,i)=>{ o[b]=y[i]; });
-      return o;
+      const o = {}; o["_DATE"]=targetAD+" (Forecast)"; o["_NEP"]=""; o["_DAY"]=dayNameOf(targetAD); o["_TYPE"]=type;
+      span.forEach((b,i)=>{ o[b]=y[i]; }); return o;
     }
-    return [ mkRow("DAM", dam), mkRow("RTM", rtm), mkRow("IEX", iex) ];
+    return [ mkRow("DAM",dam), mkRow("RTM",rtm), mkRow("IEX",iex) ];
   }
 
-  function renderTable(filtered, span, syntheticRows) {
-    const rowsForTable = filtered.slice();
-    if (syntheticRows && syntheticRows.length) {
-      rowsForTable.push(...syntheticRows);
-    }
-
-    const rowsWithStats = rowsForTable.map(r => {
-      const st = rowStats(r, span);
-      const lbl = r["_DATE"] ? r["_DATE"] : "";
-      return Object.assign({}, r, { __MIN: st.min, __MAX: st.max, __AVG: st.avg, _LABEL: lbl });
-    });
-    const aggRows = addAggregateRows(rowsWithStats, span);
-
-    const cols = [];
-    cols.push({title: 'DATE', data: '_LABEL'});
-    if (hasNepali && NEP_COL) cols.push({title: 'Nepali_Date', data: NEP_COL});
-    cols.push({title: 'Day Name', data: DAY});
-    cols.push({title: 'Date_Type', data: TYPE});
-    span.forEach(c => cols.push({title: c, data: c}));
-    cols.push({title: 'Min', data: '__MIN'});
-    cols.push({title: 'Max', data: '__MAX'});
-    cols.push({title: 'Avg', data: '__AVG'});
-
-    const tableData = rowsWithStats.concat(aggRows);
-
-    const elId = 'dataTable';
-    const wrap = document.getElementById('tableWrap');
-    wrap.innerHTML = `<table id="${elId}" class="display compact nowrap" style="width:100%"></table>`;
-
-    if (dt) { try { dt.destroy(); } catch(e) {} dt = null; }
-
-    dt = new $.fn.dataTable.Api($('#'+elId).DataTable({
-      data: tableData,
-      columns: cols,
-      paging: true, searching: true, ordering: true,
-      scrollY: '420px', scrollX: true, deferRender: true, scroller: true,
-      createdRow: function(row, data) {
-        const label = data._LABEL || '';
-        if (/\(Forecast\)$/.test(label)) {
-          $(row).css({'background':'#fff9ee'});
-        }
-        if (label === 'Aggregate-Min' || label === 'Aggregate-Max' || label === 'Aggregate-Avg') {
-          $(row).css({'font-weight':'600','border-top':'2px solid #999'});
-        }
-      },
-      columnDefs: [
-        {
-          targets: '_all',
-          render: function(data, type) {
-            if (data === "" || data === null || data === undefined) return "";
-            if (type === 'display' && !isNaN(Number(data))) {
-              const n = Number(data);
-              return Number.isFinite(n) ? n.toLocaleString() : data;
-            }
-            return data;
-          }
-        }
-      ]
-    }));
-  }
-
-  // --------- Charts ---------
+  // --------- Chart layout & "data levels" controls ---------
   function baseLayout(overrides={}){
     return Object.assign({
       template:'plotly_white',
       margin:{l:50,r:20,t:60,b:100},
       hovermode:'x unified',
+      uirevision:'keep',
       legend:{title:'Legend', font:{family:'Arial Black, Arial, sans-serif', size:12}},
       xaxis:{
         title:{text:'Block / Day', font:{family:'Arial Black, Arial, sans-serif', size:14}},
@@ -589,11 +464,47 @@ async function loadPayload() {
     }, overrides);
   }
 
-  // main chart (block-wise) with forecast overlays
+  function buildControls(chartId, tracesMeta, opts={}){
+    const list = document.getElementById('traces-'+chartId);
+    if (!list) return;
+    list.innerHTML = '';
+    tracesMeta.forEach((t,i)=>{
+      const id = `cb-${chartId}-${i}`;
+      const row = document.createElement('div');
+      row.className = 'inline';
+      row.innerHTML = `<label for="${id}" style="flex:1; font-size:12px">${t.name || ('Series '+(i+1))}</label>
+                       <input type="checkbox" id="${id}" checked>`;
+      list.appendChild(row);
+      row.querySelector('input').addEventListener('change', (e)=>{
+        Plotly.restyle(chartId, {visible: e.target.checked ? true : 'legendonly'}, [i]);
+      });
+    });
+
+    const vals = document.getElementById('vals-'+chartId);
+    if (vals) {
+      vals.onchange = function(){
+        const threshold = opts.labelsThreshold ?? Infinity;
+        const maxPoints = Math.max(0, ...tracesMeta.map(t => (t.x ? t.x.length : 0)));
+        const note = document.getElementById('vals-note-'+chartId);
+        if (vals.checked){
+          if (maxPoints >= threshold){
+            vals.checked = false;
+            if (note) note.textContent = `(Too many points: ${maxPoints} ≥ ${threshold}. Labels disabled)`;
+            return;
+          }
+          const ys = tracesMeta.map(t=>t.y ?? t.z ?? null);
+          Plotly.restyle(chartId, {'text': ys, 'textposition':'top center'});
+          if (note) note.textContent = '';
+        } else {
+          Plotly.restyle(chartId, {'text': null});
+        }
+      };
+    }
+  }
+
+  // --------- Chart 1 (block-wise) ---------
   function renderChartMain(filtered, span) {
     const useBS = modeBS.checked && hasNepali && NEP_COL;
-    const labelField = useBS ? NEP_COL : DATE;
-    const day = (daySel.value || "All");
     const tSel = (typeSel.value||"All").toUpperCase();
     const container = document.getElementById('chart');
     const traces = [];
@@ -606,93 +517,53 @@ async function loadPayload() {
     const todayISO = new Date().toISOString().slice(0,10);
 
     const singleADDay = (!useBS) && lo && hi && lo===hi;
-    const isTodaySingle = singleADDay && (lo===todayISO);
-    const wantForecastOnly = (!useBS) && lo && hi && lo===hi && lo > latestAD;
+    const futureSingle = (!useBS) && lo && hi && lo===hi && lo > latestAD;
 
-    // Averages per block for filtered rows (per type)
     function perBlockAveragesForDate(dateISO, type) {
       const subset = rows.filter(r => r[DATE]===dateISO && String(r[TYPE]).toUpperCase()===type);
       return span.map(blk => meanBlock(subset, blk));
     }
 
-    if (wantForecastOnly) {
-      const { dam, rtm, iex } = forecastSeriesForDate(lo, span);
-      traces.push({ x: span, y: dam, mode:'lines+markers', name: `DAM (Forecast ${lo})`, line:{dash:'dot'} });
-      traces.push({ x: span, y: rtm, mode:'lines+markers', name: `RTM (Forecast ${lo})`, line:{dash:'dot'} });
-      traces.push({ x: span, y: iex, mode:'lines+markers', name: `IEX (Forecast ${lo})`, line:{dash:'dashdot'} });
-      forecastNotes.textContent = "Future date: dotted = forecast (IEX = (DAM+RTM)/2).";
-      Plotly.react(container, traces, baseLayout(), {responsive:true, displayModeBar:false});
-      return { syntheticRowsForTable: buildSyntheticForecastRows(lo, span) };
-    }
-
-    if (tSel === "ALL") {
-      // Averages across filtered rows per type
-      const damMeans = span.map(c => {
-        let s=0,n=0; filtered.forEach(r=>{ if((r[TYPE]||"").toUpperCase()==="DAM"){ const v=num(r[c]); if(v!==null){s+=v;n++;}}});
-        return n? s/n : null;
-      });
-      const rtmMeans = span.map(c => {
-        let s=0,n=0; filtered.forEach(r=>{ if((r[TYPE]||"").toUpperCase()==="RTM"){ const v=num(r[c]); if(v!==null){s+=v;n++;}}});
-        return n? s/n : null;
-      });
-      const iexMeans = span.map((_,i)=> {
-        const d = damMeans[i]; const r = rtmMeans[i];
-        if (d==null && r==null) return null;
-        if (d==null) return r;
-        if (r==null) return d;
-        return (d+r)/2;
-      });
-      traces.push({ x: span, y: damMeans, mode:'lines+markers', name:'DAM (avg)' });
-      traces.push({ x: span, y: rtmMeans, mode:'lines+markers', name:'RTM (avg)' });
-      traces.push({ x: span, y: iexMeans, mode:'lines+markers', name:'IEX (avg)' });
-    } else {
-      // show mean across filtered (specific type)
-      const means = span.map(c => {
-        let s=0, n=0;
-        filtered.forEach(r => {
-          const raw = r[c];
-          if (raw === "" || raw === null || raw === undefined) return;
-          const v = Number(String(raw).replace(/,/g,''));
-          if (Number.isFinite(v)) { s += v; n += 1; }
-        });
-        return n ? s/n : null;
-      });
-      traces.push({ x: span, y: means, mode: 'lines+markers', name: `${tSel} (avg)` });
-    }
-
-    // Single-day overlay: always include forecast curve(s) + actual (if exist)
-    let synthRows = null;
-    if (singleADDay) {
-      const fc = forecastSeriesForDate(lo, span);
+    if (!singleADDay) {
       if (tSel === "ALL") {
-        const damActual = perBlockAveragesForDate(lo, "DAM");
-        const rtmActual = perBlockAveragesForDate(lo, "RTM");
-        const iexActual = damActual.map((v,i)=>{
-          const d = damActual[i], r = rtmActual[i];
-          if (d==null && r==null) return null;
-          return ((d??0)+(r??0))/2;
-        });
-        traces.push({ x: span, y: damActual, mode:'lines+markers', name:`DAM (Actual ${lo})` });
-        traces.push({ x: span, y: rtmActual, mode:'lines+markers', name:`RTM (Actual ${lo})` });
-        traces.push({ x: span, y: iexActual, mode:'lines+markers', name:`IEX (Actual ${lo})` });
-        traces.push({ x: span, y: fc.dam,   mode:'lines+markers', name:`DAM (Forecast ${lo})`, line:{dash:'dot'} });
-        traces.push({ x: span, y: fc.rtm,   mode:'lines+markers', name:`RTM (Forecast ${lo})`, line:{dash:'dot'} });
-        traces.push({ x: span, y: fc.iex,   mode:'lines+markers', name:`IEX (Forecast ${lo})`, line:{dash:'dashdot'} });
+        const damMeans = span.map(c => { let s=0,n=0; filtered.forEach(r=>{ if((r[TYPE]||"").toUpperCase()==="DAM"){ const v=num(r[c]); if(v!==null){s+=v;n++;}}}); return n? s/n : null; });
+        const rtmMeans = span.map(c => { let s=0,n=0; filtered.forEach(r=>{ if((r[TYPE]||"").toUpperCase()==="RTM"){ const v=num(r[c]); if(v!==null){s+=v;n++;}}}); return n? s/n : null; });
+        const iexMeans = span.map((_,i)=>{ const d=damMeans[i], r=rtmMeans[i]; if(d==null && r==null) return null; if(d==null) return r; if(r==null) return d; return (d+r)/2; });
+        traces.push({ x: span, y: damMeans, mode:'lines+markers', name:'DAM (avg)' });
+        traces.push({ x: span, y: rtmMeans, mode:'lines+markers', name:'RTM (avg)' });
+        traces.push({ x: span, y: iexMeans, mode:'lines+markers', name:'IEX (avg)' });
       } else {
-        const only = tSel;
-        const act = perBlockAveragesForDate(lo, only);
-        const fcy = (only==="DAM" ? fc.dam : fc.rtm);
-        traces.push({ x: span, y: act, mode:'lines+markers', name:`${only} (Actual ${lo})` });
-        traces.push({ x: span, y: fcy, mode:'lines+markers', name:`${only} (Forecast ${lo})`, line:{dash:'dot'} });
+        const means = span.map(c => { let s=0,n=0; filtered.forEach(r=>{ const raw=r[c]; if(raw===""||raw==null) return; const v=Number(String(raw).replace(/,/g,'')); if(Number.isFinite(v)){ s+=v;n++; }}); return n? s/n : null; });
+        traces.push({ x: span, y: means, mode: 'lines+markers', name: `${tSel} (avg)` });
       }
-      forecastNotes.textContent = `Single day ${lo}: solid = actual, dotted = forecast. IEX = (DAM+RTM)/2.`;
-      synthRows = buildSyntheticForecastRows(lo, span);
-    } else if (isTodaySingle) {
-      forecastNotes.textContent = `Overlay for today (${lo}): solid = actual, dotted = forecast.`;
+    }
+
+    if (singleADDay || futureSingle) {
+      const fc = forecastSeriesForDate(lo, span);
+      const damActual = perBlockAveragesForDate(lo, "DAM");
+      const rtmActual = perBlockAveragesForDate(lo, "RTM");
+      const iexActual = damActual.map((v,i)=>{ const d=damActual[i], r=rtmActual[i]; if(d==null && r==null) return null; return ((d??0)+(r??0))/2; });
+
+      traces.push({ x: span, y: damActual, mode:'lines+markers', name:`DAM (Actual ${lo})` });
+      traces.push({ x: span, y: rtmActual, mode:'lines+markers', name:`RTM (Actual ${lo})` });
+      traces.push({ x: span, y: iexActual, mode:'lines+markers', name:`IEX (Actual ${lo})` });
+      traces.push({ x: span, y: fc.dam,   mode:'lines+markers', name:`DAM (Forecast ${lo})`, line:{dash:'dot'} });
+      traces.push({ x: span, y: fc.rtm,   mode:'lines+markers', name:`RTM (Forecast ${lo})`, line:{dash:'dot'} });
+      traces.push({ x: span, y: fc.iex,   mode:'lines+markers', name:`IEX (Forecast ${lo})`, line:{dash:'dashdot'} });
+
+      forecastNotes.textContent = futureSingle
+        ? `Future single day ${lo}: dotted = forecast (actual may be unavailable). IEX = (DAM+RTM)/2.`
+        : `Single day ${lo}: solid = actual, dotted = forecast. IEX = (DAM+RTM)/2.`;
+
+      Plotly.react(container, traces, baseLayout(), {responsive:true, displayModeBar:false});
+      buildControls('chart', traces);
+      const synth = buildSyntheticForecastRows(lo, span);
+      return { syntheticRowsForTable: synth };
     }
 
     Plotly.react(container, traces, baseLayout(), {responsive:true, displayModeBar:false});
-    return { syntheticRowsForTable: synthRows };
+    buildControls('chart', traces);
+    return { syntheticRowsForTable: null };
   }
 
   // Chart 2 — Day-series (block-averaged); below table; hide for single-day
@@ -705,33 +576,20 @@ async function loadPayload() {
     const lo = useBS ? fBS.value : fAD.value;
     const hi = useBS ? sBS.value : sAD.value;
     const singleRange = (lo && hi && lo===hi);
+    if (singleRange || tSel!=="ALL") { card.style.display = "none"; return; }
 
-    if (singleRange) { card.style.display = "none"; return; } // single-day rule
-    if (tSel !== "ALL") { card.style.display = "none"; return; }
-
-    // Optionally, if range < 7 days, show just those days (already the case)
-    const { dates, dam, rtm, iex } = (function(){
-      // group by date and compute per-block avg
-      const labelField = dateField;
-      const byDate = new Map();
-      filtered.forEach(r => {
-        const key = r[labelField];
-        if (!byDate.has(key)) byDate.set(key, []);
-        byDate.get(key).push(r);
-      });
-      const d = Array.from(byDate.keys()).sort();
-      const damA=[], rtmA=[], iexA=[];
-      d.forEach(key => {
-        const bucket = byDate.get(key);
-        const damRows = bucket.filter(x => String(x[TYPE]).toUpperCase()==="DAM");
-        const rtmRows = bucket.filter(x => String(x[TYPE]).toUpperCase()==="RTM");
-        const dAvg = damRows.length ? meanArray(damRows.map(r => avgOverBlocksOfRow(r, span))) : null;
-        const rAvg = rtmRows.length ? meanArray(rtmRows.map(r => avgOverBlocksOfRow(r, span))) : null;
-        damA.push(dAvg); rtmA.push(rAvg);
-        iexA.push((dAvg==null && rAvg==null)? null : ( (dAvg??0)+(rAvg??0) )/2);
-      });
-      return { dates:d, dam:damA, rtm:rtmA, iex:iexA };
-    })();
+    const byDate = new Map();
+    filtered.forEach(r => { const key = r[dateField]; if (!byDate.has(key)) byDate.set(key, []); byDate.get(key).push(r); });
+    const dates = Array.from(byDate.keys()).sort();
+    const dam=[], rtm=[], iex=[];
+    dates.forEach(key => {
+      const bucket = byDate.get(key);
+      const damRows = bucket.filter(x => String(x[TYPE]).toUpperCase()==="DAM");
+      const rtmRows = bucket.filter(x => String(x[TYPE]).toUpperCase()==="RTM");
+      const dAvg = damRows.length ? meanArray(damRows.map(r => avgOverBlocksOfRow(r, span))) : null;
+      const rAvg = rtmRows.length ? meanArray(rtmRows.map(r => avgOverBlocksOfRow(r, span))) : null;
+      dam.push(dAvg); rtm.push(rAvg); iex.push((dAvg==null && rAvg==null)? null : ((dAvg??0)+(rAvg??0))/2);
+    });
 
     const isAD = (dateField === DATE);
     const traces = [
@@ -746,23 +604,21 @@ async function loadPayload() {
     ));
     card.style.display = "";
     Plotly.react(el, traces, layout, {responsive:true, displayModeBar:false});
+    buildControls('chart2', traces, { labelsThreshold: 100 });
   }
 
-  // Chart 3 — Weekday averages; for single day: only that day on x-axis
+  // Chart 3 — Weekday averages; plus a final "All days" aggregate column
   function renderChart3(filtered, span) {
     const card = document.getElementById('card3');
     const el = document.getElementById('chart3');
-    const tSel = (typeSel.value||"All").toUpperCase();
 
     const lo = modeBS.checked ? fBS.value : fAD.value;
     const hi = modeBS.checked ? sBS.value : sAD.value;
     const singleRange = (lo && hi && lo===hi);
 
-    // Build weekday arrays
     let categories = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-    if (singleRange && filtered.length) {
-      categories = [ String(filtered[0]._DAY || dayNameOf(lo)) ]; // single day_name only
-    }
+    if (singleRange && filtered.length) categories = [ String(filtered[0]._DAY || dayNameOf(lo)) ];
+
     const byW = new Map(categories.map(w => [w, []]));
     filtered.forEach(r => { if (byW.has(r[DAY])) byW.get(r[DAY]).push(r); });
 
@@ -771,29 +627,117 @@ async function loadPayload() {
       if (!arr.length) return null;
       return meanArray(arr.map(r => avgOverBlocksOfRow(r, span)));
     }
-    const dam = categories.map(w => aggForType(w,"DAM"));
-    const rtm = categories.map(w => aggForType(w,"RTM"));
-    const iex = categories.map((_,i)=>{
-      const d = dam[i], r = rtm[i];
-      if (d==null && r==null) return null;
-      return ((d??0)+(r??0))/2;
-    });
+    let dam = categories.map(w => aggForType(w,"DAM"));
+    let rtm = categories.map(w => aggForType(w,"RTM"));
+    let iex = categories.map((_,i)=>{ const d=dam[i], r=rtm[i]; if(d==null && r==null) return null; return ((d??0)+(r??0))/2; });
 
-    // Single-day rule: always show chart3 (with only that day column). If no data at all, hide.
-    if (!categories.length) { card.style.display = "none"; return; }
+    function overallForType(type){
+      const arr = filtered.filter(r => String(r[TYPE]).toUpperCase()===type);
+      if (!arr.length) return null;
+      return meanArray(arr.map(r => avgOverBlocksOfRow(r, span)));
+    }
+    const damAll = overallForType("DAM");
+    const rtmAll = overallForType("RTM");
+    const iexAll = (damAll==null && rtmAll==null) ? null : ((damAll??0)+(rtmAll??0))/2;
+
+    const categoriesPlus = categories.concat(["All days"]);
+    dam = dam.concat([damAll]);
+    rtm = rtm.concat([rtmAll]);
+    iex = iex.concat([iexAll]);
 
     const traces = [
-      { x: categories, y: dam, type:'bar', name:'DAM (block-avg)' },
-      { x: categories, y: rtm, type:'bar', name:'RTM (block-avg)' },
-      { x: categories, y: iex, type:'bar', name:'IEX (block-avg)' },
+      { x: categoriesPlus, y: dam, type:'bar', name:'DAM (block-avg)' },
+      { x: categoriesPlus, y: rtm, type:'bar', name:'RTM (block-avg)' },
+      { x: categoriesPlus, y: iex, type:'bar', name:'IEX (block-avg)' },
     ];
     const layout = baseLayout({
-      title: singleRange ? `Only ${categories[0]} — Weekday average`
-                         : "Weekday averages (block-averaged)",
+      title: singleRange ? `Only ${categoriesPlus[0]} — Weekday average + All days` : "Weekday averages (block-averaged) + All days",
       barmode: 'group'
     });
     card.style.display = "";
     Plotly.react(el, traces, layout, {responsive:true, displayModeBar:false});
+    buildControls('chart3', traces);
+  }
+
+  function renderTable(filtered, span, syntheticRows) {
+    const rowsForTable = filtered.slice();
+    if (syntheticRows && syntheticRows.length) rowsForTable.push(...syntheticRows);
+
+    const rowsWithStats = rowsForTable.map(r => {
+      let mn=null, mx=null, s=0, n=0;
+      span.forEach(c => { const v = num(r[c]); if (v===null) return; if (mn===null||v<mn) mn=v; if (mx===null||v>mx) mx=v; s+=v; n+=1; });
+      const st = { min:(mn===null?"":mn), max:(mx===null?"":mx), avg:(n? s/n: "") };
+      const lbl = r["_DATE"] ? r["_DATE"] : "";
+      return Object.assign({}, r, { __MIN: st.min, __MAX: st.max, __AVG: st.avg, _LABEL: lbl });
+    });
+
+    function addAggregateRows(rowsWithStats, span) {
+      const aggMin = {}, aggMax = {}, aggAvg = {};
+      span.forEach(c => {
+        let mn=null, mx=null, s=0, n=0;
+        rowsWithStats.forEach(r => {
+          const v = num(r[c]); if (v===null) return;
+          if (mn===null || v<mn) mn=v; if (mx===null || v>mx) mx=v; s+=v; n+=1;
+        });
+        aggMin[c]=(mn===null?"":mn); aggMax[c]=(mx===null?"":mx); aggAvg[c]=(n? s/n: "");
+      });
+      let minOfMin=null, maxOfMax=null, sAvg=0, nAvg=0;
+      rowsWithStats.forEach(r => {
+        const rmin=num(r.__MIN), rmax=num(r.__MAX), ravg=num(r.__AVG);
+        if (rmin!==null) minOfMin=(minOfMin===null? rmin : Math.min(minOfMin,rmin));
+        if (rmax!==null) maxOfMax=(maxOfMax===null? rmax : Math.max(maxOfMax,rmax));
+        if (ravg!==null){ sAvg+=ravg; nAvg+=1; }
+      });
+      const aggMinRow = Object.assign({}, aggMin, { _LABEL:"Aggregate-Min", __MIN:(minOfMin===null?"":minOfMin), __MAX:"", __AVG:"" });
+      const aggMaxRow = Object.assign({}, aggMax, { _LABEL:"Aggregate-Max", __MIN:"", __MAX:(maxOfMax===null?"":maxOfMax), __AVG:"" });
+      const aggAvgRow = Object.assign({}, aggAvg, { _LABEL:"Aggregate-Avg", __MIN:"", __MAX:"", __AVG:(nAvg? sAvg/nAvg: "") });
+      return [aggMinRow, aggMaxRow, aggAvgRow];
+    }
+
+    const aggRows = addAggregateRows(rowsWithStats, span);
+
+    const hasNepali = !!rowsForTable.find(r => r._NEP);
+    const cols = [];
+    cols.push({title: 'DATE', data: '_LABEL'});
+    if (hasNepali) cols.push({title: 'Nepali_Date', data: '_NEP'});
+    cols.push({title: 'Day Name', data: '_DAY'});
+    cols.push({title: 'Date_Type', data: '_TYPE'});
+    span.forEach(c => cols.push({title: c, data: c}));
+    cols.push({title: 'Min', data: '__MIN'});
+    cols.push({title: 'Max', data: '__MAX'});
+    cols.push({title: 'Avg', data: '__AVG'});
+
+    const tableData = rowsWithStats.concat(aggRows);
+
+    const elId = 'dataTable';
+    const wrap = document.getElementById('tableWrap');
+    wrap.innerHTML = `<table id="${elId}" class="display compact nowrap" style="width:100%"></table>`;
+
+    if (window.dt) { try { window.dt.destroy(); } catch(e) {} window.dt = null; }
+
+    window.dt = new $.fn.dataTable.Api($('#'+elId).DataTable({
+      data: tableData,
+      columns: cols,
+      paging: true, searching: true, ordering: true,
+      scrollY: '420px', scrollX: true, deferRender: true, scroller: true,
+      createdRow: function(row, data) {
+        const label = data._LABEL || '';
+        if (/\(Forecast\)$/.test(label)) $(row).css({'background':'#fff9ee'});
+        if (label==='Aggregate-Min' || label==='Aggregate-Max' || label==='Aggregate-Avg') {
+          $(row).css({'font-weight':'600','border-top':'2px solid #999'});
+        }
+      },
+      columnDefs: [{
+        targets: '_all',
+        render: function(data, type) {
+          if (data === "" || data === null || data === undefined) return "";
+          if (type === 'display' && !isNaN(Number(data))) {
+            const n = Number(data); return Number.isFinite(n) ? n.toLocaleString() : data;
+          }
+          return data;
+        }
+      }]
+    }));
   }
 
   function update() {
@@ -801,25 +745,20 @@ async function loadPayload() {
     const span = selectedBlockSpan();
     $('#rowCount').text(`Rows: ${filtered.length}`);
 
-    // Main chart (+ synthetic rows when needed)
     const { syntheticRowsForTable } = renderChartMain(filtered, span) || {};
-
-    // Table (with forecast rows if any)
     renderTable(filtered, span, syntheticRowsForTable);
 
-    // Single-day rule: show only chart3 (with that single day_name); hide chart2
     const singleRange = (lo && hi && lo===hi);
     if (singleRange) {
       document.getElementById('card2').style.display = "none";
       renderChart3(filtered, span);
     } else {
-      // Normal: show both extra charts as applicable
       renderChart2(filtered, span, dateField);
       renderChart3(filtered, span);
     }
   }
 
-  // Initial render
+  // Initial render + bind
   update();
   document.getElementById('generateBtn').addEventListener('click', update);
 })();
