@@ -364,10 +364,27 @@ async function loadPayload() {
   function meanArray(arr){ const zs=arr.filter(v=>v!=null && Number.isFinite(v)); if(!zs.length) return null; return zs.reduce((a,b)=>a+b,0)/zs.length; }
 
   function lastNDays(type, beforeDate, n){ const arr=orderByDate(rowsByType(type)).filter(r=>r[DATE] < beforeDate); return arr.slice(-n); }
-  function prevNDaysWindow(type,beforeDate,n,offsetN){ const arr=orderByDate(rowsByType(type)).filter(r=>r[DATE] < beforeDate); const end=arr.length - offsetN; const start=Math.max(0,end-n); return arr.slice(start,end); }
-  function pickSameWeekdaySeries(type,weekday,beforeDate,k){ const arr=orderByDate(rowsByType(type)).filter(r=>r[DATE] < beforeDate && String(r[DAY]).toLowerCase()===String(weekday).toLowerCase()); return arr.slice(-k).reverse(); }
+  function prevNDaysWindow(type,beforeDate,n,offsetN){ 
+    const arr=orderByDate(rowsByType(type)).filter(r=>r[DATE] < beforeDate);
+    const end = arr.length - offsetN;
+    const start = Math.max(0, end - n);
+    return arr.slice(start, Math.max(start, end));
+  }
+  function pickSameWeekdaySeries(type,weekday,beforeDate,k){ 
+    const arr=orderByDate(rowsByType(type)).filter(r=>r[DATE] < beforeDate && String(r[DAY]).toLowerCase()===String(weekday).toLowerCase());
+    const slice = arr.slice(-k).reverse(); // most recent first
+    return slice;
+  }
   function windowAvg(rowsArr, blk){ if(!rowsArr || !rowsArr.length) return null; return meanBlock(rowsArr, blk); }
-  function findSameDayLastYear(type, targetAD){ const d=new Date(targetAD+"T00:00:00Z"); d.setUTCFullYear(d.getUTCFullYear()-1); const yiso=d.toISOString().slice(0,10); const arr=orderByDate(rowsByType(type)).filter(r=>r[DATE]===yiso); return arr.length? arr[0] : null; }
+  function findSameDayLastYear(type, targetAD){ 
+    try {
+      const d=new Date(targetAD+"T00:00:00Z");
+      d.setUTCFullYear(d.getUTCFullYear()-1);
+      const yiso=d.toISOString().slice(0,10);
+      const arr = rowsByType(type).filter(r => r[DATE] === yiso);
+      return arr.length ? arr[0] : null;
+    } catch(e) { return null; }
+  }
 
   // Forecast series (unchanged math)
   function forecastSeriesForDate(targetAD, span) {
@@ -617,7 +634,7 @@ async function loadPayload() {
     ];
     const layout = baseLayout(Object.assign(
       { title: "Day-series (block-averaged)" },
-      isAD ? { xaxis:{type:'date', tickangle:-90, rangeslider:{visible:true}, title:{text:'Date (AD)', font:{family:'Arial Black, Arial, sans-serif', size:14}}, tickfont:{family:'Arial Black, Arial, sans-serif', size:11}} }
+      isAD ? { xaxis:{type:'date', tickangle:-90, rangeslider:{visible:true}, title:{text:'Date (AD)', font:{family:'Arial Black, Arial, sans-serif', size:14}}, tickfont:{family:'Arial Black, Arial, sans-serif', size:11}} 
            : { xaxis:{type:'category', tickangle:-90, title:{text:'Nepali Date', font:{family:'Arial Black, Arial, sans-serif', size:14}}, tickfont:{family:'Arial Black, Arial, sans-serif', size:11}} }
     ));
     card.style.display = "";
@@ -780,7 +797,7 @@ async function loadPayload() {
           return data;
         }
       }]
-    }));
+    })));
 
     // Download CSV of current table view
     document.getElementById('downloadCsvBtn').onclick = function(){
