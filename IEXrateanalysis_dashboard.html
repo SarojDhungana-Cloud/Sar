@@ -32,17 +32,34 @@
   .panel h4 { margin:0 0 8px 0; font-size:13px; }
   .trace-list { max-height:160px; overflow:auto; border:1px solid #f1f5f9; border-radius:8px; padding:6px; margin:6px 0 10px; }
   .panel .inline { justify-content: space-between; }
+
+  /* Download button near table */
+  .table-actions { display:flex; align-items:center; gap:12px; margin-bottom:8px; }
+  .btn-lite { padding:8px 12px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; cursor:pointer; }
+  .btn-lite:hover { background:#f8fafc; }
+
+  /* ---- Credit tag anchored inside the first card (top-right) ---- */
+  .credit-tag{ position:absolute; top:8px; right:8px; z-index:6; background:rgba(255,255,255,0.95); border:1px solid #e5e7eb; padding:8px 10px; border-radius:10px; font-size:12px; line-height:1.3; color:#334155; }
 </style>
 </head>
 <body>
 
-<div class="card">
+<div class="card" style="position:relative; padding-top:54px;">
+  <!-- Credit / developer tag fixed to the top-right corner of this card -->
+  <div class="credit-tag">
+    Developed by: Er. Saroj Dhungana<br>
+    Assistant Manager<br>
+    Nepal Electricity Authoriy
+  </div>
+
   <h1 style="margin:0 0 12px 0;">Summary – Custom Dashboard</h1>
   <div class="note">Data source: <code id="csvUrl"></code></div>
 </div>
 
 <div class="card">
   <h2 style="margin:0 8px 12px 0;">Filters</h2>
+
+  <!-- Top row: AD/BS mode on the left; IST/NST toggle on the RIGHT -->
   <div class="row" style="margin-bottom:10px;">
     <div class="inline">
       <input type="radio" id="modeAD" name="dateMode" value="AD" checked>
@@ -53,6 +70,17 @@
       <label for="modeBS"><b>Use Nepali_Date (BS)</b></label>
     </div>
     <span class="note" id="nepAvail"></span>
+
+    <!-- RIGHT CORNER: IST / NST toggle -->
+    <div class="inline" style="margin-left:auto;">
+      <label style="margin:0;"><b>Time</b></label>
+      <label class="inline" style="gap:6px; margin-left:8px;">
+        <input type="radio" name="tzMode" id="tzIST" value="IST" checked> IST
+      </label>
+      <label class="inline" style="gap:6px;">
+        <input type="radio" name="tzMode" id="tzNST" value="NST"> NST (+15m)
+      </label>
+    </div>
   </div>
 
   <div class="grid" id="adControls">
@@ -104,7 +132,7 @@
 
 <!-- CHART 1 -->
 <div class="card">
-  <h2 style="margin:0 0 12px 0;">Chart 1 — Block-wise</h2>
+  <h2 style="margin:0 0 12px 0;">Chart 1 — Block-wise average price plot within the specified range of days</h2>
   <div id="chart" class="chart">
     <div class="toolbar">
       <button class="toolbtn" onclick="togglePanel('chart')">⚙️ Data levels</button>
@@ -124,7 +152,10 @@
 
 <!-- DATA TABLE -->
 <div class="card">
-  <h2 style="margin:0 0 12px 0;">Data</h2>
+  <div class="table-actions">
+    <h2 style="margin:0;">Data</h2>
+    <button id="downloadCsvBtn" class="btn-lite" title="Download current table as CSV">⬇️ Download CSV</button>
+  </div>
   <div id="tableWrap"></div>
 </div>
 
@@ -150,7 +181,7 @@
 
 <!-- CHART 3 (below table) -->
 <div class="card" id="card3" style="display:none;">
-  <h2 style="margin:0 0 12px 0;">Chart 3 — Weekday averages (Sun→Sat)</h2>
+  <h2 id="chart3Title" style="margin:0 0 12px 0;">Chart 3 — Weekday averages (Sun→Sat)</h2>
   <div id="chart3" class="chart">
     <div class="toolbar">
       <button class="toolbtn" onclick="togglePanel('chart3')">⚙️ Data levels</button>
@@ -162,6 +193,25 @@
       <div class="inline">
         <label for="vals-chart3">Show values</label>
         <input id="vals-chart3" type="checkbox">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CHART 4 (new) -->
+<div class="card" id="card4" style="display:none;">
+  <h2 id="chart4Title" style="margin:0 0 12px 0;">Chart 4 — Last 7 days (block-wise, DAM / RTM)</h2>
+  <div id="chart4" class="chart">
+    <div class="toolbar">
+      <button class="toolbtn" onclick="togglePanel('chart4')">⚙️ Data levels</button>
+      <button class="toolbtn" onclick="fs('chart4')">⤢ Fullscreen</button>
+    </div>
+    <div id="panel-chart4" class="panel">
+      <h4>Series visibility</h4>
+      <div id="traces-chart4" class="trace-list"></div>
+      <div class="inline">
+        <label for="vals-chart4">Show values</label>
+        <input id="vals-chart4" type="checkbox">
       </div>
     </div>
   </div>
@@ -187,6 +237,12 @@ const CSV_URL = archiveDate ? `${SUPABASE_BASE}/archive/${archiveDate}.csv`
                             : `${SUPABASE_BASE}/latest/summary.csv`;
 document.getElementById("csvUrl").textContent = CSV_URL;
 
+/* ======= Bilateral reference rates for Chart-1 ======= */
+const BILATERAL_RATES = [
+  { label: "Bihar",    value: 5400 },
+  { label: "Haryana1", value: 5200 }
+];
+
 /* tiny CSV parser */
 function parseCSV(text) {
   const lines = text.replace(/\r/g,"").trim().split("\n");
@@ -201,20 +257,47 @@ function parseCSV(text) {
 }
 function looksLikeBlock(h) { return /^\d{2}:\d{2}\s*-\s*\d{2}:\d{2}$/.test(h); }
 
-async function loadPayload() {
-  const resp = await fetch(CSV_URL, { cache: "no-store" });
-  if (!resp.ok) throw new Error("Failed to load CSV: "+resp.status);
-  const csv = await resp.text();
-  const { headers, rows } = parseCSV(csv);
+/* ======= Utils ======= */
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function addDaysISO(iso, n){ const d=new Date(iso+"T00:00:00"); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
+function* isoRange(lo, hi){
+  let d = new Date(lo+"T00:00:00"); const end = new Date(hi+"T00:00:00");
+  while (d <= end){ yield d.toISOString().slice(0,10); d.setDate(d.getDate()+1); }
+}
+function toCSV(rows, headers){
+  const lines = [];
+  lines.push(headers.join(","));
+  rows.forEach(r=>{
+    lines.push(headers.map(h => (r[h] ?? r[h] === 0) ? String(r[h]).replace(/,/g,"") : "").join(","));
+  });
+  return lines.join("\n");
+}
 
+/* === Cache-busting fetch so CDN never serves stale CSV === */
+async function fetchTextNoCache(url) {
+  const bust = (url.includes('?') ? '&' : '?') + 'ts=' + Date.now();
+  const resp = await fetch(url + bust, { cache: 'no-store' });
+  if (!resp.ok) throw new Error('Failed to load CSV: ' + resp.status);
+  return await resp.text();
+}
+
+/* ===== Transform helper used by initial load & refresh ===== */
+function transformFromParsed(headers, rows){
   const DATE="DATE", DAY="DAY_NAME", TYPE="TYPE", NEP="NEPALI_DATE";
   const blockCols = headers.filter(looksLikeBlock);
-
   const transformed = rows.map(r => {
     const o = { _DATE:r[DATE], _DAY:r[DAY], _TYPE:r[TYPE], _NEP:r[NEP] };
     blockCols.forEach(b => o[b] = r[b]==="" ? "" : Number(r[b]));
     return o;
   });
+  return { transformed, blockCols };
+}
+
+/* ===== Initial payload load ===== */
+async function loadPayload() {
+  const csv = await fetchTextNoCache(CSV_URL);
+  const { headers, rows } = parseCSV(csv);
+  const { transformed, blockCols } = transformFromParsed(headers, rows);
 
   const days = Array.from(new Set(transformed.map(r => r._DAY).filter(Boolean))).sort();
   const typesPresent = new Set(transformed.map(r => String(r._TYPE||"").toUpperCase()));
@@ -247,8 +330,10 @@ async function loadPayload() {
 /* ========= Dashboard + Forecast + Extra Charts ========= */
 (async function () {
   const payload = await loadPayload();
-  const rows = payload.rows;
-  const blocks = payload.block_cols.slice();
+
+  // NOTE: let (not const) so live refresh can replace datasets without reloading UI
+  let rows = payload.rows;
+  let blocks = payload.block_cols.slice();
   const hasNepali = payload.has_nepali;
   const NEP_COL = payload.nep_col || "";
   const nepDates = payload.nep_dates || [];
@@ -270,6 +355,8 @@ async function loadPayload() {
   const typeSel = document.getElementById('typeSel');
   const b1Sel   = document.getElementById('blockStart');
   const bnSel   = document.getElementById('blockEnd');
+  const tzIST   = document.getElementById('tzIST');
+  const tzNST   = document.getElementById('tzNST');
 
   if (hasNepali && NEP_COL) { modeBS.disabled = false; document.getElementById('nepAvail').textContent = ""; }
   else { modeBS.disabled = true; document.getElementById('nepAvail').textContent = "(Nepali_Date not found in CSV)"; }
@@ -302,8 +389,34 @@ async function loadPayload() {
 
   function num(v){ if (v===null || v===undefined || v==="") return null; const n = Number(String(v).replace(/[, ]/g,'')); return Number.isFinite(n)? n : null; }
 
+  /* ===== Time standard handling (IST default, NST = +15m shift) ===== */
+  // We keep labels (00:00-00:15, ...) the same, but when NST is selected,
+  // we shift values forward by +1 block (15 minutes) for each row.
+  // (Circular within the same date to preserve row counts and UI.)
+  let rowsShiftedCache = null;
+  function shiftRowsBy15(srcRows, blockList){
+    // produce a deep-ish copy with values rotated by +1 block
+    return srcRows.map(r => {
+      const o = Object.assign({}, r);
+      for (let i=blockList.length-1; i>=0; i--){
+        const srcKey = blockList[i];
+        const dstKey = blockList[(i+1) % blockList.length];
+        o[dstKey] = r[srcKey];
+      }
+      return o;
+    });
+  }
+  function getRowsCurrent(){
+    if (tzNST.checked){
+      if (!rowsShiftedCache) rowsShiftedCache = shiftRowsBy15(rows, blocks);
+      return rowsShiftedCache;
+    }
+    return rows;
+  }
+
   // filters
   function filterRowsBase() {
+    const rowsNow = getRowsCurrent();
     const useBS = modeBS.checked && hasNepali && NEP_COL;
     const dateField = useBS ? NEP_COL : DATE;
     const lo = (useBS ? fBS.value : fAD.value) || "";
@@ -311,7 +424,7 @@ async function loadPayload() {
     const day = (daySel.value||"All").toLowerCase();
     const typ = (typeSel.value||"All").toUpperCase();
 
-    const filtered = rows.filter(r => {
+    const filtered = rowsNow.filter(r => {
       const d = (r[dateField]||"").trim();
       const dn = (r[DAY]||"").trim().toLowerCase();
       const tp = (r[TYPE]||"").toUpperCase();
@@ -332,8 +445,7 @@ async function loadPayload() {
 
   // helpers
   function orderByDate(arr){ return arr.slice().sort((a,b)=> String(a[DATE]).localeCompare(String(b[DATE]))); }
-  function rowsByType(type){ return rows.filter(r => String(r[TYPE]||"").toUpperCase() === type); }
-  function maxDateAD(){ const ds=rows.map(r=>r[DATE]).filter(Boolean).sort(); return ds[ds.length-1] || ""; }
+  function rowsByType(type){ const rowsNow = getRowsCurrent(); return rowsNow.filter(r => String(r[TYPE]||"").toUpperCase() === type); }
   function dayNameOf(iso){ const d = new Date(iso+"T00:00:00"); return d.toLocaleDateString("en-US",{weekday:"long"}); }
   function meanBlock(rowsArr, blk){ let s=0,n=0; rowsArr.forEach(r=>{ const v=num(r[blk]); if(v!==null){ s+=v;n++; }}); return n? s/n : null; }
   function avgOverBlocksOfRow(r, span){ let s=0,n=0; span.forEach(c=>{ const v=num(r[c]); if(v!==null){ s+=v;n++; }}); return n? s/n : null; }
@@ -343,20 +455,14 @@ async function loadPayload() {
   function prevNDaysWindow(type,beforeDate,n,offsetN){ const arr=orderByDate(rowsByType(type)).filter(r=>r[DATE] < beforeDate); const end=arr.length - offsetN; const start=Math.max(0,end-n); return arr.slice(start,end); }
   function pickSameWeekdaySeries(type,weekday,beforeDate,k){ const arr=orderByDate(rowsByType(type)).filter(r=>r[DATE] < beforeDate && String(r[DAY]).toLowerCase()===String(weekday).toLowerCase()); return arr.slice(-k).reverse(); }
   function windowAvg(rowsArr, blk){ if(!rowsArr || !rowsArr.length) return null; return meanBlock(rowsArr, blk); }
-  function findSameDayLastYear(type, targetAD){ const d=new Date(targetAD+"T00:00:00Z"); d.setUTCFullYear(d.getUTCFullYear()-1); const yiso=d.toISOString().slice(0,10); const arr=orderByDate(rowsByType(type)).filter(r=>r[DATE]===yiso); return arr.length? arr[0] : null; }
+  function findSameDayLastYear(type, targetAD){ const rowsNow = getRowsCurrent(); const d=new Date(targetAD+"T00:00:00Z"); d.setUTCFullYear(d.getUTCFullYear()-1); const yiso=d.toISOString().slice(0,10); const arr=orderByDate(rowsNow.filter(r=>String(r[TYPE]).toUpperCase()===type)).filter(r=>r[DATE]===yiso); return arr.length? arr[0] : null; }
 
-  // Forecast logic (as set previously)
+  // Forecast series (unchanged math)
   function forecastSeriesForDate(targetAD, span) {
-    const latest = maxDateAD();
-    const daysAhead = Math.max(0, Math.round((new Date(targetAD) - new Date(latest)) / 86400000));
     const weekday = dayNameOf(targetAD);
-
     function buildForType(tp) {
       const w1 = pickSameWeekdaySeries(tp, weekday, targetAD, 1)[0];
       const w2 = pickSameWeekdaySeries(tp, weekday, targetAD, 2)[1];
-      const w3 = pickSameWeekdaySeries(tp, weekday, targetAD, 3)[2];
-      const w4 = pickSameWeekdaySeries(tp, weekday, targetAD, 4)[3];
-
       const last7   = lastNDays(tp, targetAD, 7);
       const prev7   = prevNDaysWindow(tp, targetAD, 7, 7);
       const last28  = lastNDays(tp, targetAD, 28);
@@ -368,117 +474,89 @@ async function loadPayload() {
       return span.map(blk => {
         const wn1 = w1 ? num(w1[blk]) ?? 0 : 0;
         const wn2 = w2 ? num(w2[blk]) ?? 0 : 0;
-        const wn3 = w3 ? num(w3[blk]) ?? 0 : 0;
-        const wn4 = w4 ? num(w4[blk]) ?? 0 : 0;
-
         const last7Avg  = windowAvg(last7,  blk) ?? 0;
         const prev7Avg  = windowAvg(prev7,  blk) ?? 0;
         const last28Avg = windowAvg(last28, blk) ?? 0;
         const prev28Avg = windowAvg(prev28, blk) ?? 0;
         const last120Avg= windowAvg(last120,blk) ?? 0;
         const prev120Avg= windowAvg(prev120,blk) ?? 0;
-        const lyVal     = sameLY ? (num(sameLY[blk]) ?? 0) : 0;
 
-        let base = 0.3*wn1 + 0.2*wn2 + 0.1*wn3 + 0.05*wn4;
-        let val = base;
-
-        if (daysAhead <= 7) {
-          val += 0.4 * (wn1 + (last7Avg - prev7Avg));
-        } else if (daysAhead <= 30) {
-          val += 0.2*(wn1 + (last28Avg - prev28Avg)) + 0.2*(wn1 + (last7Avg - prev7Avg));
-        } else {
-          val += 0.4 * ( (last120Avg - prev120Avg) + ((wn1 + lyVal)/2) );
-        }
+        let val = 0.3*wn1 + 0.2*wn2;
+        val += 0.2*(wn1 + (last28Avg - prev28Avg)*0.6) + 0.3*(wn1 + (last7Avg - prev7Avg)*0.8);
+        val = Math.max(0, Math.min(10000, val));
         return val;
       });
     }
-
     const dam = buildForType("DAM");
     const rtm = buildForType("RTM");
     const iex = dam.map((v,i)=> (v + (rtm[i]??0)) / 2);
-    return { dam, rtm, iex, daysAhead };
+    return { dam, rtm, iex };
   }
 
-  // ---------- DataTable helpers ----------
-  let dt = null;
-
-  function rowStats(r, span) {
-    let mn=null, mx=null, s=0, n=0;
-    span.forEach(c => {
-      const v = num(r[c]);
-      if (v === null) return;
-      if (mn === null || v < mn) mn = v;
-      if (mx === null || v > mx) mx = v;
-      s += v; n += 1;
-    });
-    return { min: (mn===null? "": mn), max: (mx===null? "": mx), avg: (n? s/n: "") };
-  }
-  function addAggregateRows(rowsWithStats, span) {
-    const aggMin = {}, aggMax = {}, aggAvg = {};
-    span.forEach(c => {
-      let mn=null, mx=null, s=0, n=0;
-      rowsWithStats.forEach(r => {
-        const v = num(r[c]); if (v === null) return;
-        if (mn===null || v<mn) mn=v; if (mx===null || v>mx) mx=v; s+=v; n+=1;
+  /* ---------- Helpers for Chart-1 reference lines ---------- */
+  function computeSpanAverage(filteredRows, span){
+    let sum=0, n=0;
+    filteredRows.forEach(r=>{
+      span.forEach(b=>{
+        const v = num(r[b]);
+        if (v!==null){ sum += v; n += 1; }
       });
-      aggMin[c]=(mn===null?"":mn); aggMax[c]=(mx===null?"":mx); aggAvg[c]=(n? s/n: "");
     });
-    let minOfMin=null, maxOfMax=null, sAvg=0, nAvg=0;
-    rowsWithStats.forEach(r => {
-      const rmin=num(r.__MIN), rmax=num(r.__MAX), ravg=num(r.__AVG);
-      if (rmin!==null) minOfMin=(minOfMin===null? rmin : Math.min(minOfMin,rmin));
-      if (rmax!==null) maxOfMax=(maxOfMax===null? rmax : Math.max(maxOfMax,rmax));
-      if (ravg!==null){ sAvg+=ravg; nAvg+=1; }
-    });
-    const aggMinRow = Object.assign({}, aggMin, { _LABEL:"Aggregate-Min", __MIN:(minOfMin===null?"":minOfMin), __MAX:"", __AVG:"" });
-    const aggMaxRow = Object.assign({}, aggMax, { _LABEL:"Aggregate-Max", __MIN:"", __MAX:(maxOfMax===null?"":maxOfMax), __AVG:"" });
-    const aggAvgRow = Object.assign({}, aggAvg, { _LABEL:"Aggregate-Avg", __MIN:"", __MAX:"", __AVG:(nAvg? sAvg/nAvg: "") });
-    return [aggMinRow, aggMaxRow, aggAvgRow];
+    return n ? (sum / n) : null;
   }
-  function buildSyntheticForecastRows(targetAD, span) {
-    const { dam, rtm, iex } = forecastSeriesForDate(targetAD, span);
-    function mkRow(type, y) {
-      const o = {}; o["_DATE"]=targetAD+" (Forecast)"; o["_NEP"]=""; o["_DAY"]=dayNameOf(targetAD); o["_TYPE"]=type;
-      span.forEach((b,i)=>{ o[b]=y[i]; }); return o;
+  function addReferenceLines(traces, span, filteredRows){
+    const avg = computeSpanAverage(filteredRows, span);
+    if (avg !== null){
+      traces.push({
+        x: span,
+        y: Array(span.length).fill(avg),
+        mode: 'lines',
+        name: `Average (${Math.round(avg)})`,
+        line: { dash: 'dash', width: 2 }
+      });
     }
-    return [ mkRow("DAM",dam), mkRow("RTM",rtm), mkRow("IEX",iex) ];
+    BILATERAL_RATES.forEach(r=>{
+      if (typeof r.value === 'number' && Number.isFinite(r.value)){
+        traces.push({
+          x: span,
+          y: Array(span.length).fill(r.value),
+          mode: 'lines',
+          name: `Bilateral — ${r.label} (${r.value})`,
+          line: { dash: 'dot', width: 1 }
+        });
+      }
+    });
   }
 
-  // --------- Chart layout & "data levels" controls ---------
-  function baseLayout(overrides={}){
+  // --------- Chart layout & controls (unchanged) ---------
+  function baseLayout(overrides={}) {
     return Object.assign({
       template:'plotly_white',
       margin:{l:50,r:20,t:60,b:100},
       hovermode:'x unified',
       uirevision:'keep',
       legend:{title:'Legend', font:{family:'Arial Black, Arial, sans-serif', size:12}},
-      xaxis:{
-        title:{text:'Block / Day', font:{family:'Arial Black, Arial, sans-serif', size:14}},
-        tickfont:{family:'Arial Black, Arial, sans-serif', size:11},
-        tickangle:-90
-      },
-      yaxis:{
-        title:{text:'Value', font:{family:'Arial Black, Arial, sans-serif', size:14}},
-        tickfont:{family:'Arial Black, Arial, sans-serif', size:11}
-      }
+      xaxis:{ title:{text:'Block / Day', font:{family:'Arial Black, Arial, sans-serif', size:14}}, tickfont:{family:'Arial Black, Arial, sans-serif', size:11}, tickangle:-90 },
+      yaxis:{ title:{text:'Value', font:{family:'Arial Black, Arial, sans-serif', size:14}}, tickfont:{family:'Arial Black, Arial, sans-serif', size:11} }
     }, overrides);
   }
 
-  function buildControls(chartId, tracesMeta, opts={}){
+  function buildControls(chartId, tracesMeta, opts={}) {
     const list = document.getElementById('traces-'+chartId);
-    if (!list) return;
-    list.innerHTML = '';
-    tracesMeta.forEach((t,i)=>{
-      const id = `cb-${chartId}-${i}`;
-      const row = document.createElement('div');
-      row.className = 'inline';
-      row.innerHTML = `<label for="${id}" style="flex:1; font-size:12px">${t.name || ('Series '+(i+1))}</label>
-                       <input type="checkbox" id="${id}" checked>`;
-      list.appendChild(row);
-      row.querySelector('input').addEventListener('change', (e)=>{
-        Plotly.restyle(chartId, {visible: e.target.checked ? true : 'legendonly'}, [i]);
+    if (list) {
+      list.innerHTML = '';
+      tracesMeta.forEach((t,i)=>{
+        const id = `cb-${chartId}-${i}`;
+        const row = document.createElement('div');
+        row.className = 'inline';
+        row.innerHTML = `<label for="${id}" style="flex:1; font-size:12px">${t.name || ('Series '+(i+1))}</label>
+                         <input type="checkbox" id="${id}" checked>`;
+        list.appendChild(row);
+        row.querySelector('input').addEventListener('change', (e)=>{
+          Plotly.restyle(chartId, {visible: e.target.checked ? true : 'legendonly'}, [i]);
+        });
       });
-    });
+    }
 
     const vals = document.getElementById('vals-'+chartId);
     if (vals) {
@@ -502,71 +580,100 @@ async function loadPayload() {
     }
   }
 
-  // --------- Chart 1 (block-wise) ---------
-  function renderChartMain(filtered, span) {
-    const useBS = modeBS.checked && hasNepali && NEP_COL;
-    const tSel = (typeSel.value||"All").toUpperCase();
+  // --------- Chart 1 ---------
+  function renderChartMain(filtered, span, mode) {
     const container = document.getElementById('chart');
     const traces = [];
-    const latestAD = maxDateAD();
     const forecastNotes = document.getElementById('forecastNotes');
     forecastNotes.textContent = "";
 
-    const lo = useBS ? fBS.value : fAD.value;
-    const hi = useBS ? sBS.value : sAD.value;
-    const todayISO = new Date().toISOString().slice(0,10);
-
-    const singleADDay = (!useBS) && lo && hi && lo===hi;
-    const futureSingle = (!useBS) && lo && hi && lo===hi && lo > latestAD;
+    function addExtremaMarkers(x, y, baseName){
+      const finite = y.map((v,i)=>({v, i})).filter(o => Number.isFinite(o.v));
+      if (!finite.length) return [];
+      let min = finite[0], max = finite[0];
+      finite.forEach(o => { if (o.v < min.v) min=o; if (o.v > max.v) max=o; });
+      const mkMin = { x:[x[min.i]], y:[y[min.i]], mode:'markers', name: `${baseName} — Min`, showlegend:false, marker:{ size:10, symbol:'triangle-down', line:{width:1} } };
+      const mkMax = { x:[x[max.i]], y:[y[max.i]], mode:'markers', name: `${baseName} — Max`, showlegend:false, marker:{ size:10, symbol:'star', line:{width:1} } };
+      return [mkMin, mkMax];
+    }
 
     function perBlockAveragesForDate(dateISO, type) {
-      const subset = rows.filter(r => r[DATE]===dateISO && String(r[TYPE]).toUpperCase()===type);
+      const rowsNow = getRowsCurrent();
+      const subset = rowsNow.filter(r => r[DATE]===dateISO && String(r[TYPE]).toUpperCase()===type);
       return span.map(blk => meanBlock(subset, blk));
     }
 
-    if (!singleADDay) {
+    function addRealCurvesOverFiltered() {
+      const tSel = (typeSel.value||"All").toUpperCase();
       if (tSel === "ALL") {
         const damMeans = span.map(c => { let s=0,n=0; filtered.forEach(r=>{ if((r[TYPE]||"").toUpperCase()==="DAM"){ const v=num(r[c]); if(v!==null){s+=v;n++;}}}); return n? s/n : null; });
         const rtmMeans = span.map(c => { let s=0,n=0; filtered.forEach(r=>{ if((r[TYPE]||"").toUpperCase()==="RTM"){ const v=num(r[c]); if(v!==null){s+=v;n++;}}}); return n? s/n : null; });
         const iexMeans = span.map((_,i)=>{ const d=damMeans[i], r=rtmMeans[i]; if(d==null && r==null) return null; if(d==null) return r; if(r==null) return d; return (d+r)/2; });
         traces.push({ x: span, y: damMeans, mode:'lines+markers', name:'DAM (avg)' });
+        traces.push(...addExtremaMarkers(span, damMeans, 'DAM (avg)'));
         traces.push({ x: span, y: rtmMeans, mode:'lines+markers', name:'RTM (avg)' });
+        traces.push(...addExtremaMarkers(span, rtmMeans, 'RTM (avg)'));
         traces.push({ x: span, y: iexMeans, mode:'lines+markers', name:'IEX (avg)' });
+        traces.push(...addExtremaMarkers(span, iexMeans, 'IEX (avg)'));
       } else {
-        const means = span.map(c => { let s=0,n=0; filtered.forEach(r=>{ const raw=r[c]; if(raw===""||raw==null) return; const v=Number(String(raw).replace(/,/g,'')); if(Number.isFinite(v)){ s+=v;n++; }}); return n? s/n : null; });
+        const means = span.map(c => { let s=0,n=0; filtered.forEach(r=>{ const v=num(r[c]); if(v!==null){ s+=v;n++; }}); return n? s/n : null; });
         traces.push({ x: span, y: means, mode: 'lines+markers', name: `${tSel} (avg)` });
+        traces.push(...addExtremaMarkers(span, means, `${tSel} (avg)`));
       }
     }
 
-    if (singleADDay || futureSingle) {
+    if (mode === 'past-only') {
+      addRealCurvesOverFiltered();
+      addReferenceLines(traces, span, filtered); // average + bilateral
+      forecastNotes.textContent = `Past selection: real curves only.`;
+      Plotly.react(container, traces, baseLayout(), {responsive:true, displayModeBar:false});
+      buildControls('chart', traces);
+      return { syntheticRowsForTable: null, futureDates: null };
+    }
+
+    if (mode === 'future-only') {
+      const lo = fAD.value, hi = sAD.value;
+      const days = Array.from(isoRange(lo, hi));
+      const d0 = days[0] || lo;
+      const fc = forecastSeriesForDate(d0, span);
+      traces.push({ x: span, y: fc.dam, mode:'lines+markers', name:`DAM (Forecast ${d0})`, line:{dash:'dot'} });
+      traces.push({ x: span, y: fc.rtm, mode:'lines+markers', name:`RTM (Forecast ${d0})`, line:{dash:'dot'} });
+      traces.push({ x: span, y: fc.iex, mode:'lines+markers', name:`IEX (Forecast ${d0})`, line:{dash:'dashdot'} });
+      addReferenceLines(traces, span, []); // bilateral only
+      forecastNotes.textContent = `Future selection: forecast curves only. IEX = (DAM+RTM)/2.`;
+      Plotly.react(container, traces, baseLayout(), {responsive:true, displayModeBar:false});
+      buildControls('chart', traces);
+      return { syntheticRowsForTable: null, futureDates: days };
+    }
+
+    if (mode === 'today-both') {
+      const lo = fAD.value;
       const fc = forecastSeriesForDate(lo, span);
       const damActual = perBlockAveragesForDate(lo, "DAM");
       const rtmActual = perBlockAveragesForDate(lo, "RTM");
-      const iexActual = damActual.map((v,i)=>{ const d=damActual[i], r=rtmActual[i]; if(d==null && r==null) return null; return ((d??0)+(r??0))/2; });
+      const iexActual = span.map((_,i)=>{
+        const d=damActual[i], r=rtmActual[i];
+        if (d==null && r==null) return null;
+        return ((d??0)+(r??0))/2;
+      });
 
       traces.push({ x: span, y: damActual, mode:'lines+markers', name:`DAM (Actual ${lo})` });
       traces.push({ x: span, y: rtmActual, mode:'lines+markers', name:`RTM (Actual ${lo})` });
       traces.push({ x: span, y: iexActual, mode:'lines+markers', name:`IEX (Actual ${lo})` });
-      traces.push({ x: span, y: fc.dam,   mode:'lines+markers', name:`DAM (Forecast ${lo})`, line:{dash:'dot'} });
-      traces.push({ x: span, y: fc.rtm,   mode:'lines+markers', name:`RTM (Forecast ${lo})`, line:{dash:'dot'} });
-      traces.push({ x: span, y: fc.iex,   mode:'lines+markers', name:`IEX (Forecast ${lo})`, line:{dash:'dashdot'} });
 
-      forecastNotes.textContent = futureSingle
-        ? `Future single day ${lo}: dotted = forecast (actual may be unavailable). IEX = (DAM+RTM)/2.`
-        : `Single day ${lo}: solid = actual, dotted = forecast. IEX = (DAM+RTM)/2.`;
+      traces.push({ x: span, y: fc.dam, mode:'lines+markers', name:`DAM (Forecast ${lo})`, line:{dash:'dot'} });
+      traces.push({ x: span, y: fc.rtm, mode:'lines+markers', name:`RTM (Forecast ${lo})`, line:{dash:'dot'} });
+      traces.push({ x: span, y: fc.iex, mode:'lines+markers', name:`IEX (Forecast ${lo})`, line:{dash:'dashdot'} });
 
+      addReferenceLines(traces, span, filtered); // average + bilateral
+      forecastNotes.textContent = `Today selected (${lo}). Showing actual (solid) and forecast (dotted). IEX = (DAM+RTM)/2.`;
       Plotly.react(container, traces, baseLayout(), {responsive:true, displayModeBar:false});
       buildControls('chart', traces);
-      const synth = buildSyntheticForecastRows(lo, span);
-      return { syntheticRowsForTable: synth };
+      return { syntheticRowsForTable: null, futureDates: null };
     }
-
-    Plotly.react(container, traces, baseLayout(), {responsive:true, displayModeBar:false});
-    buildControls('chart', traces);
-    return { syntheticRowsForTable: null };
   }
 
-  // Chart 2 — Day-series (block-averaged); below table; hide for single-day
+  // --------- Chart 2 ---------
   function renderChart2(filtered, span, dateField) {
     const card = document.getElementById('card2');
     const el = document.getElementById('chart2');
@@ -607,17 +714,59 @@ async function loadPayload() {
     buildControls('chart2', traces, { labelsThreshold: 100 });
   }
 
-  // Chart 3 — Weekday averages; plus a final "All days" aggregate column
-  function renderChart3(filtered, span) {
+  // --------- Chart 3 ---------
+  function renderChart3(filtered, span, hide) {
     const card = document.getElementById('card3');
     const el = document.getElementById('chart3');
+    const titleEl = document.getElementById('chart3Title');
+    if (hide) { card.style.display = "none"; return; }
 
-    const lo = modeBS.checked ? fBS.value : fAD.value;
-    const hi = modeBS.checked ? sBS.value : sAD.value;
+    const selectedDay = (daySel.value || "All");
+    const tSel = (typeSel.value||"All").toUpperCase();
+
+    if (selectedDay !== "All") {
+      const DATEF = DATE;
+      const dates = Array.from(new Set(filtered.map(r => r[DATEF]).filter(Boolean))).sort();
+      const traces = [];
+
+      function yFor(dateISO, type) {
+        if (type === "IEX") {
+          const damRows = filtered.filter(r => r[DATE]===dateISO && String(r[TYPE]).toUpperCase()==="DAM");
+          const rtmRows = filtered.filter(r => r[DATE]===dateISO && String(r[TYPE]).toUpperCase()==="RTM");
+          return span.map(blk => {
+            const dAvg = damRows.length ? meanBlock(damRows, blk) : null;
+            const rAvg = rtmRows.length ? meanBlock(rtmRows, blk) : null;
+            if (dAvg==null && rAvg==null) return null;
+            return ((dAvg??0)+(rAvg??0))/2;
+          });
+        } else {
+          const rowsThis = filtered.filter(r => r[DATE]===dateISO && String(r[TYPE]).toUpperCase()===type);
+          return span.map(blk => meanBlock(rowsThis, blk));
+        }
+      }
+
+      const seriesToShow = (tSel === "ALL") ? ["DAM","RTM","IEX"] : [tSel];
+      seriesToShow.forEach(tp => {
+        dates.forEach(dISO => {
+          const y = yFor(dISO, tp);
+          traces.push({ x: span, y, mode:'lines+markers', name:`${tp} — ${dISO}` });
+        });
+      });
+
+      titleEl.textContent = `Chart 3 — ${selectedDay}: Block-wise real values (lines per date)`;
+      card.style.display = "";
+      Plotly.react(el, traces, baseLayout(), {responsive:true, displayModeBar:false});
+      buildControls('chart3', traces, { labelsThreshold: 100 });
+      return;
+    }
+
+    const useBS = modeAD.checked ? false : true;
+    const lo = (useBS ? fBS.value : fAD.value) || "";
+    const hi = (useBS ? sBS.value : sAD.value) || "";
     const singleRange = (lo && hi && lo===hi);
 
     let categories = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-    if (singleRange && filtered.length) categories = [ String(filtered[0]._DAY || dayNameOf(lo)) ];
+    if (singleRange && filtered.length) categories = [ String(filtered[0][DAY]) ];
 
     const byW = new Map(categories.map(w => [w, []]));
     filtered.forEach(r => { if (byW.has(r[DAY])) byW.get(r[DAY]).push(r); });
@@ -627,41 +776,79 @@ async function loadPayload() {
       if (!arr.length) return null;
       return meanArray(arr.map(r => avgOverBlocksOfRow(r, span)));
     }
-    let dam = categories.map(w => aggForType(w,"DAM"));
-    let rtm = categories.map(w => aggForType(w,"RTM"));
-    let iex = categories.map((_,i)=>{ const d=dam[i], r=rtm[i]; if(d==null && r==null) return null; return ((d??0)+(r??0))/2; });
 
-    function overallForType(type){
-      const arr = filtered.filter(r => String(r[TYPE]).toUpperCase()===type);
-      if (!arr.length) return null;
-      return meanArray(arr.map(r => avgOverBlocksOfRow(r, span)));
+    let traces = [];
+    if (tSel === "DAM" || tSel === "RTM") {
+      const y = categories.map(w => aggForType(w, tSel));
+      traces = [{ x: categories, y, type:'bar', name: `${tSel} (block-avg)` }];
+    } else {
+      let dam = categories.map(w => aggForType(w,"DAM"));
+      let rtm = categories.map(w => aggForType(w,"RTM"));
+      let iex = categories.map((_,i)=>{ const d=dam[i], r=rtm[i]; if(d==null && r==null) return null; return ((d??0)+(r??0))/2; });
+      traces = [
+        { x: categories, y: dam, type:'bar', name:'DAM (block-avg)' },
+        { x: categories, y: rtm, type:'bar', name:'RTM (block-avg)' },
+        { x: categories, y: iex, type:'bar', name:'IEX (block-avg)' },
+      ];
     }
-    const damAll = overallForType("DAM");
-    const rtmAll = overallForType("RTM");
-    const iexAll = (damAll==null && rtmAll==null) ? null : ((damAll??0)+(rtmAll??0))/2;
 
-    const categoriesPlus = categories.concat(["All days"]);
-    dam = dam.concat([damAll]);
-    rtm = rtm.concat([rtmAll]);
-    iex = iex.concat([iexAll]);
-
-    const traces = [
-      { x: categoriesPlus, y: dam, type:'bar', name:'DAM (block-avg)' },
-      { x: categoriesPlus, y: rtm, type:'bar', name:'RTM (block-avg)' },
-      { x: categoriesPlus, y: iex, type:'bar', name:'IEX (block-avg)' },
-    ];
-    const layout = baseLayout({
-      title: singleRange ? `Only ${categoriesPlus[0]} — Weekday average + All days` : "Weekday averages (block-averaged) + All days",
-      barmode: 'group'
-    });
+    titleEl.textContent = singleRange ? `Only ${categories[0]} — Weekday average` : "Weekday averages (block-averaged)";
     card.style.display = "";
-    Plotly.react(el, traces, layout, {responsive:true, displayModeBar:false});
+    Plotly.react(el, traces, baseLayout({ barmode:'group' }), {responsive:true, displayModeBar:false});
     buildControls('chart3', traces);
   }
 
-  function renderTable(filtered, span, syntheticRows) {
+  // --------- Chart 4 ---------
+  function renderChart4(span) {
+    const card = document.getElementById('card4');
+    const el = document.getElementById('chart4');
+    const titleEl = document.getElementById('chart4Title');
+
+    const rowsNow = getRowsCurrent();
+    const allDates = Array.from(new Set(rowsNow.map(r => r[DATE]).filter(Boolean))).sort();
+    const last7 = allDates.slice(-7);
+    if (!last7.length || !span.length) { card.style.display = "none"; return; }
+
+    const tSel = (typeSel.value || "All").toUpperCase();
+    const seriesToShow = (tSel === "ALL") ? ["DAM","RTM"] : [tSel]; // IEX not included here
+
+    function legendLabelForADDate(dateISO) {
+      const useNep = (modeBS.checked && hasNepali && NEP_COL);
+      const r = rowsNow.find(x => x[DATE] === dateISO) || {};
+      const nep = r[NEP] || "";
+      const day = r[DAY] || (function(){ try { return new Date(dateISO+"T00:00:00").toLocaleDateString("en-US",{weekday:"long"});} catch(e){return "";} })();
+      const dateText = useNep && nep ? nep : dateISO;
+      return `${dateText}<br>${day}`;
+    }
+
+    function yFor(dateISO, type) {
+      const subset = rowsNow.filter(r => r[DATE]===dateISO && String(r[TYPE]).toUpperCase()===type);
+      return span.map(blk => meanBlock(subset, blk));
+    }
+
+    const traces = [];
+    seriesToShow.forEach(tp => {
+      last7.forEach(dISO => {
+        const y = yFor(dISO, tp);
+        const label = legendLabelForADDate(dISO);
+        traces.push({ x: span, y, mode:'lines+markers', name:`${tp} — ${label}` });
+      });
+    });
+
+    titleEl.textContent = "Chart 4 — Last 7 days (block-wise, DAM / RTM)";
+    card.style.display = "";
+    Plotly.react(el, traces, baseLayout(), {responsive:true, displayModeBar:false});
+    buildControls('chart4', traces, { labelsThreshold: 100 });
+  }
+
+  // ---------- Table ----------
+  function renderTable(filtered, span, syntheticRows, futureDatesForTable) {
     const rowsForTable = filtered.slice();
     if (syntheticRows && syntheticRows.length) rowsForTable.push(...syntheticRows);
+    if (futureDatesForTable && futureDatesForTable.length) {
+      rowsForTable.length = 0; // forecast-only table for future ranges
+      futureDatesForTable.forEach(dISO => rowsForTable.push(...buildSyntheticForecastRowsForDate(dISO, span)));
+    }
 
     const rowsWithStats = rowsForTable.map(r => {
       let mn=null, mx=null, s=0, n=0;
@@ -671,7 +858,7 @@ async function loadPayload() {
       return Object.assign({}, r, { __MIN: st.min, __MAX: st.max, __AVG: st.avg, _LABEL: lbl });
     });
 
-    function addAggregateRows(rowsWithStats, span) {
+    function buildAggregateRows(rowsWithStats, span) {
       const aggMin = {}, aggMax = {}, aggAvg = {};
       span.forEach(c => {
         let mn=null, mx=null, s=0, n=0;
@@ -694,7 +881,7 @@ async function loadPayload() {
       return [aggMinRow, aggMaxRow, aggAvgRow];
     }
 
-    const aggRows = addAggregateRows(rowsWithStats, span);
+    const aggRows = buildAggregateRows(rowsWithStats, span);
 
     const hasNepali = !!rowsForTable.find(r => r._NEP);
     const cols = [];
@@ -738,29 +925,105 @@ async function loadPayload() {
         }
       }]
     }));
+
+    document.getElementById('downloadCsvBtn').onclick = function(){
+      const api = window.dt;
+      const rows = api.rows({search:'applied'}).data().toArray();
+      const headers = cols.map(c=>c.title);
+      const out = rows.map(r=>{
+        const obj = {};
+        cols.forEach(c=>{
+          const key = c.data;
+          obj[c.title] = r[key] ?? "";
+        });
+        return obj;
+      });
+      const csv = toCSV(out, headers);
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'summary_table.csv';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    };
   }
 
-  function update() {
+  function renderChartAndTableFromFilters() {
+    // Reset shifted cache so a new NST/IST choice takes effect on Generate
+    rowsShiftedCache = null;
+
     const { filtered, dateField, lo, hi } = filterRowsBase();
     const span = selectedBlockSpan();
     $('#rowCount').text(`Rows: ${filtered.length}`);
 
-    const { syntheticRowsForTable } = renderChartMain(filtered, span) || {};
-    renderTable(filtered, span, syntheticRowsForTable);
+    const isAD = (dateField === DATE);
+    let mode = 'past-only';
+    let futureDatesForTable = null;
+
+    if (isAD && lo && hi) {
+      const today = todayISO();
+      const isSingle = (lo === hi);
+      if (isSingle && lo === today) {
+        mode = 'today-both';
+      } else if (hi < today) {
+        mode = 'past-only';
+      } else if (lo > today) {
+        mode = 'future-only';
+        futureDatesForTable = Array.from(isoRange(lo, hi));
+      } else {
+        mode = 'past-only';
+      }
+    }
+
+    const main = renderChartMain(filtered, span, mode) || {};
+    renderTable(filtered, span, main.syntheticRowsForTable || null, futureDatesForTable);
 
     const singleRange = (lo && hi && lo===hi);
-    if (singleRange) {
-      document.getElementById('card2').style.display = "none";
-      renderChart3(filtered, span);
-    } else {
-      renderChart2(filtered, span, dateField);
-      renderChart3(filtered, span);
+    if (!singleRange) renderChart2(filtered, span, dateField); else document.getElementById('card2').style.display = "none";
+
+    const hideC3 = (mode === 'future-only');
+    renderChart3(filtered, span, hideC3);
+
+    renderChart4(span);
+  }
+
+  // ====== live data refresh every 15 minutes (no page reload) ======
+  async function refreshData(){
+    try {
+      const csv = await fetchTextNoCache(CSV_URL);
+      const { headers, rows: raw } = parseCSV(csv);
+      const { transformed, blockCols } = transformFromParsed(headers, raw);
+
+      // Preserve current block selections if possible
+      const currentStart = b1Sel.value;
+      const currentEnd   = bnSel.value;
+
+      rows = transformed;
+      const newBlocks = blockCols.slice();
+      blocks = newBlocks;
+
+      // invalidate NST cache (since base rows changed)
+      rowsShiftedCache = null;
+
+      // If previously selected blocks disappeared, clamp to ends
+      if (!newBlocks.includes(currentStart) && newBlocks.length) b1Sel.value = newBlocks[0];
+      if (!newBlocks.includes(currentEnd)   && newBlocks.length) bnSel.value = newBlocks[newBlocks.length-1];
+
+      // Redraw with current filters and current IST/NST choice
+      renderChartAndTableFromFilters();
+    } catch(e){
+      console.warn("refreshData() failed:", e);
+      // Keep last good data and UI intact
     }
   }
 
   // Initial render + bind
-  update();
-  document.getElementById('generateBtn').addEventListener('click', update);
+  renderChartAndTableFromFilters();
+  document.getElementById('generateBtn').addEventListener('click', renderChartAndTableFromFilters);
+
+  // Kick off periodic refresh (15 minutes)
+  setInterval(refreshData, 15*60*1000);
 })();
 </script>
 
