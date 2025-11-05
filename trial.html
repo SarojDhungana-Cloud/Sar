@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Cloud Dashboard – Google Sheets Charts</title>
+
+<style>
+  :root{
+    --bg:#f7fafc; --card:#fff; --ink:#0f172a; --muted:#64748b; --brand:#2563eb; --line:#e5e7eb;
+  }
+  html,body{height:100%}
+  body{margin:0; font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; background:var(--bg); color:var(--ink)}
+  .wrap{max-width:1100px; margin:24px auto; padding:0 16px}
+  .toolbar{
+    display:flex; gap:8px; flex-wrap:wrap; align-items:center; background:var(--card);
+    border:1px solid var(--line); padding:10px; border-radius:12px; position:sticky; top:0; z-index:10;
+    box-shadow: 0 6px 20px rgb(2 6 23 / 4%);
+  }
+  .toolbar .title{font-weight:700; margin-right:auto}
+  .btn{appearance:none; border:1px solid var(--line); background:#fff; padding:8px 12px; border-radius:10px; cursor:pointer}
+  .btn.brand{background:var(--brand); border-color:var(--brand); color:#fff}
+  .btn.ghost{background:transparent}
+  .btn:disabled{opacity:.5; cursor:not-allowed}
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:12px; margin-top:14px}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden}
+  .card .hd{display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid var(--line)}
+  .card .hd .t{font-weight:600}
+  .card .ct{padding:10px}
+  .card img{display:block; width:100%; height:auto}
+  .muted{color:var(--muted)}
+  .row{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+  input[type="text"]{width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:10px}
+  dialog{border:none; border-radius:12px; padding:0; width:min(720px,96vw)}
+  .dlg{padding:16px}
+  .dlg h3{margin:0 0 8px 0}
+  .hint{font-size:12px; color:var(--muted)}
+  .pill{display:inline-block; font-size:12px; padding:3px 8px; border-radius:999px; background:#eef2ff; color:#3730a3; border:1px solid #c7d2fe}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="toolbar">
+    <div class="title">Sheets → Dashboard (Charts)</div>
+
+    <!-- Open the specific tab -->
+    <button class="btn" id="openSheetBtn">Open “Tablesandcharts”</button>
+
+    <!-- Add a published chart by URL -->
+    <button class="btn brand" id="addChartBtn">Add chart</button>
+
+    <!-- Optional: clear all saved -->
+    <button class="btn ghost" id="clearAllBtn" title="Remove all saved charts">Clear all</button>
+
+    <!-- Future: OAuth mode -->
+    <span class="pill" title="V1 uses Publish-to-web URLs; V2 can add Google login for auto-discovery">V1: Publish URLs</span>
+  </div>
+
+  <div style="margin-top:12px" class="muted">
+    Tip: In Google Sheets → select a chart → <b>Publish chart</b> → <b>Image (PNG)</b> → Publish → copy URL → use “Add chart”.
+  </div>
+
+  <!-- Gallery -->
+  <div id="gallery" class="grid" aria-live="polite"></div>
+
+  <!-- Add chart dialog -->
+  <dialog id="chartDlg">
+    <div class="dlg">
+      <h3>Add a chart from Google Sheets</h3>
+      <div class="hint" style="margin-bottom:8px">
+        Paste the chart’s <b>Publish to web</b> PNG URL and give it a friendly title. You can find it via: Chart → ⋮ → Publish chart → Image.
+      </div>
+      <div class="row" style="margin-bottom:8px">
+        <input id="chartTitle" type="text" placeholder="Chart title (e.g., RTM – By Block)" />
+      </div>
+      <div class="row" style="margin-bottom:8px">
+        <input id="chartUrl" type="text" placeholder="https://docs.google.com/spreadsheets/d/e/.../pubchart?oid=123456789&format=png"/>
+      </div>
+      <div class="row" style="justify-content:flex-end; gap:8px; margin-top:8px">
+        <button class="btn ghost" id="dlgCancel">Cancel</button>
+        <button class="btn brand" id="dlgSave">Save to dashboard</button>
+      </div>
+      <div class="hint" style="margin-top:10px">
+        Your selections are saved in this browser (localStorage). You can export/import later if you want multi-browser sync.
+      </div>
+    </div>
+  </dialog>
+
+</div>
+
+<script>
+/* --- CONFIG --- */
+const SHEET_ID = "YOUR_SHEET_ID_HERE";           // put your sheet id here
+const TABLESANDCHARTS_GID = "40325727";          // gid of "Tablesandcharts" tab
+const OPEN_SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit#gid=${TABLESANDCHARTS_GID}`;
+
+const STORE_KEY = "gs_dash_charts_v1";
+
+/* --- DOM --- */
+const gallery   = document.getElementById('gallery');
+const openBtn   = document.getElementById('openSheetBtn');
+const addBtn    = document.getElementById('addChartBtn');
+const clearBtn  = document.getElementById('clearAllBtn');
+
+const dlg       = document.getElementById('chartDlg');
+const dlgTitle  = document.getElementById('chartTitle');
+const dlgUrl    = document.getElementById('chartUrl');
+const dlgCancel = document.getElementById('dlgCancel');
+const dlgSave   = document.getElementById('dlgSave');
+
+/* --- Helpers --- */
+function loadCharts(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  }catch(e){ return []; }
+}
+function saveCharts(list){
+  localStorage.setItem(STORE_KEY, JSON.stringify(list));
+}
+function validPubChartUrl(u){
+  try{
+    const url = new URL(u);
+    // Minimal checks: docs.google.com + pubchart + format=png/image
+    return (url.hostname.includes('docs.google.com') &&
+            url.pathname.includes('/pubchart') &&
+            (/format=png|format=image/.test(url.search)));
+  }catch(e){ return false; }
+}
+function render(){
+  const list = loadCharts();
+  gallery.innerHTML = '';
+  if(!list.length){
+    const empty = document.createElement('div');
+    empty.className = 'card';
+    empty.innerHTML = `
+      <div class="hd"><div class="t">No charts yet</div></div>
+      <div class="ct">
+        <div class="muted">Click <b>Add chart</b> and paste a published chart URL from your “Tablesandcharts” tab.</div>
+      </div>`;
+    gallery.appendChild(empty);
+    return;
+  }
+  list.forEach((c, idx)=>{
+    const card = document.createElement('div');
+    card.className='card';
+    // Cache-bust query so you can force refresh
+    const imgSrc = c.url + (c.url.includes('?') ? '&' : '?') + 't=' + Date.now();
+    card.innerHTML = `
+      <div class="hd">
+        <div class="t" title="${c.url}">${c.title || 'Chart'}</div>
+        <div class="row">
+          <button class="btn ghost" data-action="refresh" data-idx="${idx}" title="Refresh image">↻</button>
+          <button class="btn ghost" data-action="remove" data-idx="${idx}" title="Remove from dashboard">✕</button>
+        </div>
+      </div>
+      <div class="ct"><img loading="lazy" alt="${c.title||''}" src="${imgSrc}"/></div>
+    `;
+    gallery.appendChild(card);
+  });
+}
+function addChart(title, url){
+  const list = loadCharts();
+  list.push({ title, url });
+  saveCharts(list);
+  render();
+}
+function removeChart(i){
+  const list = loadCharts();
+  list.splice(i,1);
+  saveCharts(list);
+  render();
+}
+
+/* --- Events --- */
+openBtn.addEventListener('click', ()=> window.open(OPEN_SHEET_URL, '_blank'));
+
+addBtn.addEventListener('click', ()=>{
+  dlgTitle.value = '';
+  dlgUrl.value   = '';
+  dlg.showModal();
+});
+dlgCancel.addEventListener('click', ()=> dlg.close());
+dlgSave.addEventListener('click', ()=>{
+  const t = dlgTitle.value.trim();
+  const u = dlgUrl.value.trim();
+  if(!t){ alert('Please enter a chart title'); return; }
+  if(!validPubChartUrl(u)){
+    alert('Please paste a valid “Publish chart” PNG URL from Google Sheets.');
+    return;
+  }
+  addChart(t, u);
+  dlg.close();
+});
+clearBtn.addEventListener('click', ()=>{
+  if(confirm('Remove all saved charts from this browser?')){ saveCharts([]); render(); }
+});
+gallery.addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-action]');
+  if(!btn) return;
+  const idx = +btn.dataset.idx;
+  const action = btn.dataset.action;
+  if(action === 'remove'){ removeChart(idx); }
+  if(action === 'refresh'){ render(); }
+});
+
+/* --- Boot --- */
+render();
+
+/* --- OPTIONAL: V2 OAuth hooks (placeholder) ---
+   If/when you want auto-discovery (list charts without pasting URLs),
+   we can add Google Identity Services + Sheets API here to enumerate
+   EmbeddedCharts on the "Tablesandcharts" sheet, then guide publishing.
+*/
+</script>
+</body>
+</html>
